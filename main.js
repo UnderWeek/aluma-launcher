@@ -197,6 +197,7 @@ handle('stop', (id) => {
 })
 
 handle('mods:search', (q) => M.search(q))
+handle('mods:details', (q) => M.details(q))
 handle('mods:list', ({ instId, kind }) => M.list(instId, kind))
 handle('mods:toggle', ({ instId, kind, file, enable }) => M.toggle(instId, kind, file, enable))
 handle('mods:remove', ({ instId, kind, file }) => M.remove(instId, kind, file))

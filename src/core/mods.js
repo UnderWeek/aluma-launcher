@@ -95,6 +95,23 @@ async function search({ source, kind, query, mc, loader, sort, offset = 0, limit
 }
 
 const baseName = (n) => path.basename(String(n))
+async function details({ source, id, kind, mc, loader }) {
+  id = encodeURIComponent(String(id))
+  if (source === 'curseforge') {
+    const q = new URLSearchParams({ pageSize: 50 })
+    if (mc) q.set('gameVersion', mc)
+    if (kindOf(kind).loader && CF_LOADER[loader]) q.set('modLoaderType', CF_LOADER[loader])
+    const [project, body, files] = await Promise.all([cf('/mods/' + id), cf('/mods/' + id + '/description'), cf('/mods/' + id + '/files?' + q)])
+    const p = project.data
+    return { title: p.name, description: p.summary, body: body.data, format: 'html', icon: p.logo?.thumbnailUrl || '', author: p.authors.map(a => a.name).join(', '), downloads: p.downloadCount, categories: p.categories.map(c => c.name), gameVersions: [...new Set(files.data.flatMap(f => f.gameVersions))], versions: files.data.map(f => ({ id: String(f.id), name: f.displayName, number: f.fileName, gameVersions: f.gameVersions, date: f.fileDate, type: ['release', 'beta', 'alpha'][f.releaseType - 1] || '' })) }
+  }
+  const q = new URLSearchParams()
+  if (mc) q.set('game_versions', JSON.stringify([mc]))
+  if (kindOf(kind).loader && loader && loader !== 'vanilla') q.set('loaders', JSON.stringify([loader]))
+  const get = p => U.fetchJson(MR + p, { signal: AbortSignal.timeout(30000) })
+  const [p, versions, team] = await Promise.all([get('/project/' + id), get('/project/' + id + '/version?' + q), get('/project/' + id + '/members')])
+  return { title: p.title, description: p.description, body: p.body, format: 'markdown', icon: p.icon_url || '', author: team.map(m => m.user.username).join(', '), downloads: p.downloads, categories: p.categories, gameVersions: p.game_versions, license: p.license?.name || p.license?.id, versions: versions.sort((a, b) => new Date(b.date_published) - new Date(a.date_published)).map(v => ({ id: v.id, name: v.name, number: v.version_number, gameVersions: v.game_versions, loaders: v.loaders, date: v.date_published, type: v.version_type })) }
+}
 function safeFile(name) {
   const b = baseName(name)
   if (!b || b !== name || b.startsWith('.')) throw new LErr('mods.badName')
@@ -279,4 +296,4 @@ async function openDir(instId, kind) {
   return d
 }
 
-module.exports = { search, install, list, toggle, remove, openDir, testCurseforge, installMany }
+module.exports = { search, details, install, list, toggle, remove, openDir, testCurseforge, installMany }

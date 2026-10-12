@@ -70,6 +70,7 @@ function applyTheme() {
 mq.onchange = () => S && applyTheme()
 
 function setPage(name) {
+  if (name !== 'browse' && typeof closeModDetails === 'function') closeModDetails()
   const same = name === page && $('#page-' + name).classList.contains('active')
   if (same) return
   closeMenu()

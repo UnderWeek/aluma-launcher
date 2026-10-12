@@ -410,3 +410,26 @@ input:checked+.sw::after{left:calc(100% - 26px);width:24px;height:24px;backgroun
 .su-code{display:flex;flex-direction:column;gap:6px;align-items:center;padding:16px;border-radius:16px;background:var(--sc-high)}
 .su-code b{font-size:32px;letter-spacing:6px;font-weight:500;user-select:text;color:var(--primary)}
 .setup-open .wc,.setup-open .drag{z-index:160}
+
+.mod-row .meta{cursor:pointer}
+.mod-row:focus-visible{outline:2px solid var(--primary);outline-offset:-3px}
+.mod-row.detail-active{box-shadow:inset 3px 0 var(--primary)}
+.mod-detail{position:fixed;z-index:30;right:24px;top:80px;width:440px;height:calc(100vh - 208px);max-height:760px;max-width:calc(100vw - 140px);border:1px solid var(--outline-v);border-radius:24px;background:var(--sc-high);box-shadow:0 16px 60px #0006;display:flex;flex-direction:column;overflow:hidden;animation:detail-in var(--d3) var(--e-emph)}
+.mod-detail[hidden]{display:none}
+@keyframes detail-in{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:translateX(0)}}
+.mod-detail-head{padding:20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--outline-v);flex:none}
+.mod-detail-head h3{margin:0;font-size:20px;overflow-wrap:anywhere}
+.mod-detail-head .ic{width:48px;height:48px;border-radius:14px;object-fit:cover;flex:none;display:grid;place-items:center}
+.mod-detail-head .icon-btn{margin-left:auto}
+.mod-detail-tabs{padding:12px 20px;display:flex;gap:8px;flex:none;border-bottom:1px solid var(--outline-v)}
+.mod-detail-scroll{padding:20px;overflow:auto;min-height:0;flex:1;overflow-wrap:anywhere;overscroll-behavior:contain}
+.mod-detail-summary{margin:0 0 20px;line-height:1.6}
+.mod-detail-tags{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 20px}
+.mod-detail-tags span{border-radius:8px;padding:4px 8px;font-size:12px;background:var(--sc-highest)}
+.mod-detail-description{line-height:1.65;white-space:pre-wrap;font-size:14px}
+.mod-detail-version{padding:14px 0;border-bottom:1px solid var(--outline-v)}
+.mod-detail-version strong{display:block;margin-bottom:6px}
+.mod-detail-version .muted{line-height:1.6;font-size:12px}
+body[data-motion="off"] .mod-detail{animation:none}
+
+.mod-detail-scroll{user-select:text}

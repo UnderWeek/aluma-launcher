@@ -28,7 +28,7 @@ function resultCard(h, idx) {
   const key = modKey(h)
   const installed = installedMods.has(key)
   const checked = selectedMods.has(key)
-  return `<div class="item mod-row ${checked ? 'selected' : ''}" data-k="${esc(key)}" data-idx="${idx}" role="listitem">
+  return `<div class="item mod-row ${checked ? 'selected' : ''}" data-k="${esc(key)}" data-idx="${idx}" role="listitem" tabindex="0" aria-label="${esc(t('browse.detailsFor', { name: h.title }))}">
     ${h.icon ? `<img class="ic sq" src="${esc(h.icon)}" loading="lazy" alt="">` : `<div class="ic sq">${ic('puzzle')}</div>`}
     <div class="meta"><div class="nm">${esc(h.title)}</div><div class="muted label">${esc(h.author)} · ${ic('download')}${fmtNum(h.downloads)}</div><div class="desc">${esc(h.description)}</div></div>
     <div class="mod-choice">${installed ? `<span class="mod-installed">${ic('check')}${esc(t('browse.installed'))}</span>` : ''}
@@ -54,6 +54,7 @@ function updateBatchBar() {
 }
 
 function clearSelection() {
+  closeModDetails()
   selectedMods.clear()
   installedMods.clear()
   updateBatchBar()
@@ -147,6 +148,15 @@ $('#bResults').onchange = event => {
 }
 $('#bResults').onclick = event => {
   if (event.target.closest('#more')) return browseSearch(false)
+  if (event.target.closest('.mod-choice')) return
+  const row = event.target.closest('.mod-row[data-idx]')
+  if (row) openModDetails(browseState.hits[+row.dataset.idx])
+}
+$('#bResults').onkeydown = event => {
+  if (event.target.matches('.mod-row') && ['Enter', ' '].includes(event.key)) {
+    event.preventDefault()
+    openModDetails(browseState.hits[+event.target.dataset.idx])
+  }
 }
 $('#bClear').onclick = () => {
   selectedMods.clear()
@@ -229,3 +239,63 @@ onEnter.browse = () => {
     browseSearch(true)
   }
 }
+
+
+const modDetails = { seq: 0, hit: null, data: null, tab: 'description', cache: new Map(), focus: null }
+function closeModDetails() {
+  modDetails.seq++
+  modDetails.hit = null
+  $('#bDetail').hidden = true
+  $$('.detail-active').forEach(row => row.classList.remove('detail-active'))
+  if (modDetails.focus?.isConnected && $('#bDetail').contains(document.activeElement)) modDetails.focus.focus()
+}
+
+function descriptionText(data) {
+  // Remote HTML is parsed in an inert document and never inserted into the app.
+  if (data.format === 'html') {
+    const doc = new DOMParser().parseFromString(data.body || '', 'text/html')
+    doc.querySelectorAll('script,style,iframe').forEach(el => el.remove())
+    doc.querySelectorAll('p,div,li,h1,h2,h3,br').forEach(el => el.prepend(doc.createTextNode('\n')))
+    return doc.body.textContent.trim()
+  }
+  return (data.body || '').replace(/<[^>]*>/g, '').replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/^#{1,6}\s+/gm, '').replace(/\*\*([^*]+)\*\*/g, '$1')
+}
+
+function renderModDetails(error) {
+  const panel = $('#bDetail')
+  const hit = modDetails.hit
+  if (!hit) return
+  const data = modDetails.data
+  const icon = data?.icon || hit.icon
+  panel.innerHTML = `<div class="mod-detail-head">${icon ? `<img class="ic" src="${esc(icon)}" alt="">` : `<div class="ic">${ic('puzzle')}</div>`}<div class="grow"><h3 id="bDetailTitle">${esc(data?.title || hit.title)}</h3><div class="muted label">${esc(data?.author || hit.author)}</div></div><button class="icon-btn" id="bDetailClose" aria-label="${esc(t('common.close'))}">${ic('close')}</button></div>
+    ${data ? `<div class="mod-detail-tabs"><button class="btn ${modDetails.tab === 'description' ? 'tonal' : 'text'}" data-detail-tab="description">${esc(t('browse.description'))}</button><button class="btn ${modDetails.tab === 'versions' ? 'tonal' : 'text'}" data-detail-tab="versions">${esc(t('browse.versions'))} · ${data.versions.length}</button></div>` : ''}
+    <div class="mod-detail-scroll" aria-live="polite">${error ? `<p>${esc(error)}</p><button class="btn tonal" id="bDetailRetry">${esc(t('common.retry'))}</button>` : !data ? `<p class="muted">${esc(t('browse.detailsLoading'))}</p>` : modDetails.tab === 'description' ? `<p class="mod-detail-summary">${esc(data.description)}</p><div class="muted label">${esc(t('sort.downloads'))}: ${fmtNum(data.downloads)}${data.license ? ' · ' + esc(data.license) : ''}</div><div class="mod-detail-tags">${(data.categories || []).map(c => `<span>${esc(c)}</span>`).join('')}</div><h4>Minecraft</h4><p class="muted label">${esc((data.gameVersions || []).join(' · '))}</p><div class="mod-detail-description">${esc(descriptionText(data) || data.description)}</div>` : `<p class="muted label">${esc(t('browse.versionsFor', { mc: instById($('#bInst').value)?.mc || '' }))}</p>${data.versions.length ? data.versions.map(v => `<div class="mod-detail-version"><strong>${esc(v.name || v.number)}</strong><div class="muted">${esc(v.number)} · ${esc(v.type)}<br>Minecraft ${esc(v.gameVersions.join(', '))}${v.loaders?.length ? ' · ' + esc(v.loaders.join(', ')) : ''}<br>${esc(new Date(v.date).toLocaleDateString())}</div></div>`).join('') : `<p>${esc(t('common.nothing'))}</p>`}`}</div>`
+  $('#bDetailClose').onclick = closeModDetails
+  if ($('#bDetailRetry')) $('#bDetailRetry').onclick = () => openModDetails(hit)
+  $$('[data-detail-tab]', panel).forEach(button => { button.onclick = () => { modDetails.tab = button.dataset.detailTab; renderModDetails(); $('[data-detail-tab="' + modDetails.tab + '"]', panel).focus() } })
+}
+
+async function openModDetails(hit) {
+  if (!hit) return
+  const target = instById($('#bInst').value)
+  const key = `${modKey(hit)}:${browseState.kind}:${target?.mc}:${target?.loader}`
+  const seq = ++modDetails.seq
+  modDetails.focus = document.activeElement
+  Object.assign(modDetails, { hit, data: modDetails.cache.get(key) || null, tab: 'description' })
+  $$('.mod-row[data-k]').forEach(row => row.classList.toggle('detail-active', row.dataset.k === modKey(hit)))
+  $('#bDetail').hidden = false
+  renderModDetails()
+  $('#bDetailClose').focus()
+  if (modDetails.data) return
+  try {
+    const response = await api.modsDetails({ source: hit.source, id: hit.id, kind: browseState.kind, mc: target?.mc, loader: target?.loader })
+    if (seq !== modDetails.seq) return
+    if (!response.ok) return renderModDetails(errFrom(response.code, response.params, response.error))
+    modDetails.cache.set(key, response.data)
+    modDetails.data = response.data
+    renderModDetails()
+  } catch (error) {
+    if (seq === modDetails.seq) renderModDetails(error.message)
+  }
+}
+addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#bDetail').hidden) closeModDetails() })
