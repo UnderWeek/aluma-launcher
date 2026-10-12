@@ -14,7 +14,7 @@ async function run() {
       if (parsed.pathname.endsWith('/version')) {
         assert.equal(parsed.searchParams.get('game_versions'), '["1.21.1"]')
         assert.equal(parsed.searchParams.get('loaders'), '["fabric"]')
-        return [{ id: 'v', name: 'Release', version_number: '1', game_versions: ['1.21.1'], loaders: ['fabric'], date_published: '2026-10-12', version_type: 'release' }]
+        return [{ id: 'v', name: 'Release', version_number: '1', game_versions: ['1.21.1'], loaders: ['fabric'], date_published: '2026-10-12', version_type: 'release', files: [{}] }]
       }
       return { title: 'Project', description: 'Summary', body: '# Full description', categories: ['optimization'], game_versions: ['1.21.1'], downloads: 42, license: { name: 'MIT' } }
     }

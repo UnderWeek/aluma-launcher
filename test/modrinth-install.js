@@ -118,7 +118,7 @@ async function run() {
   reset()
   add(makeVersion('a', 'a1', [dependency(null, 'b1')]))
   add(makeVersion('b', 'b1', [], { loaders: ['forge'] }))
-  await assert.rejects(install(instance('wrong-loader'), ['a']), { code: 'mods.noFile' })
+  await assert.rejects(install(instance('wrong-loader'), ['a']), { code: 'mods.noProjectFile' })
   assert.equal(downloaded.length, 0)
   await assert.rejects(install({ ...instance('vanilla'), loader: 'vanilla' }, ['a']), { code: 'mods.noLoader' })
 

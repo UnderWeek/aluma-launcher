@@ -117,12 +117,13 @@ async function browseSearch(reset) {
   const start = browseState.hits.length
   browseState.hits.push(...r.data.hits)
   browseState.total = r.data.total
-  browseState.offset = browseState.hits.length
-  const rest = browseState.total > browseState.hits.length
+  browseState.offset = r.data.nextOffset ?? browseState.hits.length
+  const rest = r.data.hasMore ?? (browseState.total > browseState.offset)
   if (reset) box.innerHTML = ''
   $('#more', box) && $('#more', box).remove()
   if (!browseState.hits.length) {
     box.innerHTML = `<div class="empty-big small"><div class="eb-ic">${ic('search')}</div><h3>${esc(t('common.nothing'))}</h3></div>`
+    if (rest) box.insertAdjacentHTML('beforeend', `<button class="btn tonal" id="more">${esc(t('browse.more'))}</button>`)
     return
   }
   const frag = document.createElement('div')

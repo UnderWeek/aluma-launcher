@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const C = require('./config')
 const U = require('./util')
 const { LErr } = require('./errors')
+const { compatibleVersion, versionQuery } = require('./mod-compatibility')
 
 const MR = 'https://api.modrinth.com/v2'
 const safeFile = (name) => {
@@ -24,8 +25,8 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
   }
   const project = async (id) => request('/project/' + encodeURIComponent(id))
   const version = async (id) => request('/version/' + encodeURIComponent(id))
-  const compatible = (v) => (v.game_versions || []).includes(instance.mc) && (!mods || (v.loaders || []).includes(instance.loader)) && !['server_only', 'dedicated_server_only'].includes(v.environment)
-  const noFile = () => new LErr('mods.noFile', { mc: instance.mc, loader: instance.loader })
+  const compatible = (v) => compatibleVersion(v, { mc: instance.mc, loader: instance.loader, kind })
+  const noFile = async (id) => new LErr('mods.noProjectFile', { name: (await project(id)).title, mc: instance.mc, loader: instance.loader })
   const root = C.instanceRoot(instance)
   const directory = path.join(C.gameDir(instance), { mods: 'mods', resourcepacks: 'resourcepacks', shaderpacks: 'shaderpacks' }[kind])
   const trackPath = path.join(root, 'installed.json')
@@ -47,8 +48,7 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
     if (meta.enabled && !roots.has(id)) fixed.set(id, await version(meta.versionId))
   }
   const candidates = async (id) => {
-    const q = new URLSearchParams({ game_versions: JSON.stringify([instance.mc]), include_changelog: 'false' })
-    if (mods) q.set('loaders', JSON.stringify([instance.loader]))
+    const q = versionQuery({ mc: instance.mc, loader: instance.loader, kind })
     const values = await request(`/project/${encodeURIComponent(id)}/version?${q}`)
     return values.filter(compatible).sort((a, b) => (a.version_type === 'release' ? 0 : 1) - (b.version_type === 'release' ? 0 : 1) || new Date(b.date_published) - new Date(a.date_published))
   }
@@ -60,7 +60,7 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
       if (compatible(current)) selected = current
     }
     if (!selected) selected = (await candidates(id))[0]
-    if (!selected || !compatible(selected)) throw noFile()
+    if (!selected || !compatible(selected)) throw await noFile(id)
     choices.set(id, selected)
     return selected
   }
@@ -84,7 +84,7 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
           const pinned = await version(dep.version_id)
           if (target && target !== pinned.project_id) throw new LErr('mods.dependency', { name: id })
           target = pinned.project_id
-          if (!compatible(pinned)) throw noFile()
+          if (!compatible(pinned)) throw await noFile(target)
           if (!pins.has(target)) pins.set(target, new Set())
           pins.get(target).add(pinned.id)
         }
@@ -121,7 +121,7 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
   const names = new Map()
   for (const [id, selected] of resolved) {
     const file = selected.files.find(f => f.primary) || selected.files[0]
-    if (!file) throw noFile()
+    if (!file) throw await noFile(id)
     const name = safeFile(file.filename)
     if (names.has(name) && names.get(name) !== id) throw new LErr('mods.conflict', { name })
     names.set(name, id)

@@ -6,6 +6,7 @@ const U = require('./util')
 const H = require('./http')
 const K = require('./keys')
 const { LErr } = require('./errors')
+const { compatibleVersion, versionQuery } = require('./mod-compatibility')
 
 const KINDS = {
   mods: { dir: 'mods', mr: 'mod', cf: 6, loader: true },
@@ -77,11 +78,26 @@ async function search({ source, kind, query, mc, loader, sort, offset = 0, limit
   const facets = [[`project_type:${k.mr}`]]
   if (mc) facets.push([`versions:${mc}`])
   if (k.loader && loader && loader !== 'vanilla') facets.push([`categories:${loader}`])
-  const q = new URLSearchParams({ query: query || '', limit, offset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
-  const r = await mr('/search?' + q)
+  const target = { kind, mc, loader }
+  let r, hits, nextOffset = offset
+  // Search facets describe a whole project; verify an actual client file.
+  for (let page = 0; page < 5; page++) {
+    const q = new URLSearchParams({ query: query || '', limit, offset: nextOffset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
+    r = await mr('/search?' + q)
+    const available = new Map()
+    await U.pool(r.hits, 6, async h => {
+      const versions = await U.fetchJson(MR + '/project/' + encodeURIComponent(h.project_id) + '/version?' + versionQuery(target), { signal: AbortSignal.timeout(30000) })
+      available.set(h.project_id, versions.some(v => compatibleVersion(v, target)))
+    })
+    nextOffset += r.hits.length
+    hits = r.hits.filter(h => available.get(h.project_id))
+    if (hits.length || !r.hits.length || nextOffset >= r.total_hits) break
+  }
   return {
     total: r.total_hits,
-    hits: r.hits.map((h) => ({
+    nextOffset,
+    hasMore: nextOffset < r.total_hits,
+    hits: hits.map((h) => ({
       id: h.project_id,
       source: 'modrinth',
       title: h.title,
@@ -105,12 +121,10 @@ async function details({ source, id, kind, mc, loader }) {
     const p = project.data
     return { title: p.name, description: p.summary, body: body.data, format: 'html', icon: p.logo?.thumbnailUrl || '', author: p.authors.map(a => a.name).join(', '), downloads: p.downloadCount, categories: p.categories.map(c => c.name), gameVersions: [...new Set(files.data.flatMap(f => f.gameVersions))], versions: files.data.map(f => ({ id: String(f.id), name: f.displayName, number: f.fileName, gameVersions: f.gameVersions, date: f.fileDate, type: ['release', 'beta', 'alpha'][f.releaseType - 1] || '' })) }
   }
-  const q = new URLSearchParams()
-  if (mc) q.set('game_versions', JSON.stringify([mc]))
-  if (kindOf(kind).loader && loader && loader !== 'vanilla') q.set('loaders', JSON.stringify([loader]))
+  const q = versionQuery({ mc, loader, kind })
   const get = p => U.fetchJson(MR + p, { signal: AbortSignal.timeout(30000) })
   const [p, versions, team] = await Promise.all([get('/project/' + id), get('/project/' + id + '/version?' + q), get('/project/' + id + '/members')])
-  return { title: p.title, description: p.description, body: p.body, format: 'markdown', icon: p.icon_url || '', author: team.map(m => m.user.username).join(', '), downloads: p.downloads, categories: p.categories, gameVersions: p.game_versions, license: p.license?.name || p.license?.id, versions: versions.sort((a, b) => new Date(b.date_published) - new Date(a.date_published)).map(v => ({ id: v.id, name: v.name, number: v.version_number, gameVersions: v.game_versions, loaders: v.loaders, date: v.date_published, type: v.version_type })) }
+  return { title: p.title, description: p.description, body: p.body, format: 'markdown', icon: p.icon_url || '', author: team.map(m => m.user.username).join(', '), downloads: p.downloads, categories: p.categories, gameVersions: p.game_versions, license: p.license?.name || p.license?.id, versions: versions.filter(v => compatibleVersion(v, { mc, loader, kind })).sort((a, b) => new Date(b.date_published) - new Date(a.date_published)).map(v => ({ id: v.id, name: v.name, number: v.version_number, gameVersions: v.game_versions, loaders: v.loaders, date: v.date_published, type: v.version_type })) }
 }
 function safeFile(name) {
   const b = baseName(name)
