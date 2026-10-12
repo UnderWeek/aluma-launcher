@@ -169,7 +169,7 @@ function refreshInstancePage() {
   if (!i) return
   if (!$('#iPlay')) return buildInstancePage()
   $('#iName').textContent = i.name
-  $('#iIc').textContent = glyphText(i)
+  $('#iIc').innerHTML = glyph(i)
   $('#iSub').textContent = `${i.mc} · ${loaderName(i)}`
   const run = S.running.includes(i.id)
   const prep = busy.has(i.id)
@@ -264,7 +264,7 @@ async function loadContent() {
   }
 }
 
-const ICON_CHOICES = ['', '⛏', '🌲', '⚔', '🧱', '🔥', '💎', '🐉', '🌌', '🍎', '🚀', '👑']
+const ICON_CHOICES = ['', ...Object.keys(INSTANCE_ICONS)]
 
 function renderInstSettings(pane, i) {
   const o = i.overrides || {}
@@ -274,7 +274,7 @@ function renderInstSettings(pane, i) {
       ${tf('sName', t('inst.name'), i.name, 'maxlength="40"')}
       ${tf('sGroup', t('inst.group'), i.group || '', 'maxlength="30"')}
       <div class="field-label">${esc(t('inst.icon'))}</div>
-      <div class="icons" id="sIcons">${ICON_CHOICES.map((c) => `<button class="hit ico ${(i.icon || '') === c ? 'on' : ''}" data-c="${c}">${c || esc(t('inst.iconAuto'))}</button>`).join('')}</div>
+      <div class="icons" id="sIcons">${ICON_CHOICES.map((c) => `<button class="hit ico ${instanceIconKey(i.icon) === c ? 'on' : ''}" data-c="${c}" title="${esc(t(c ? 'inst.icon.' + c : 'inst.iconAuto'))}" aria-label="${esc(t(c ? 'inst.icon.' + c : 'inst.iconAuto'))}" aria-pressed="${instanceIconKey(i.icon) === c}">${c ? instanceIconSvg(c) : esc(t('inst.iconAuto'))}</button>`).join('')}</div>
       <div class="locrow"><div class="loc"><div class="label muted">${esc(t('inst.location'))}</div><div class="locpath">${esc(i.path)}</div></div>
         <button class="btn tonal" id="sOpen">${ic('open')}${esc(t('common.open'))}</button><button class="btn tonal" id="sMove">${ic('swap')}${esc(t('inst.move'))}</button></div>
     </div>
@@ -316,9 +316,12 @@ function renderInstSettings(pane, i) {
   $('#sIcons').onclick = async (e) => {
     const b = e.target.closest('.ico')
     if (!b) return
-    $$('#sIcons .ico').forEach((x) => x.classList.toggle('on', x === b))
+    $$('#sIcons .ico').forEach((x) => {
+      x.classList.toggle('on', x === b)
+      x.setAttribute('aria-pressed', String(x === b))
+    })
     await patch({ icon: b.dataset.c })
-    $('#iIc').textContent = glyphText(instById(i.id))
+    $('#iIc').innerHTML = glyph(instById(i.id))
     flash($('#iIc'), 'pop')
   }
   $('#sOpen').onclick = () => api.openFolder(i.id)

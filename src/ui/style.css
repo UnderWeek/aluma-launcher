@@ -261,7 +261,12 @@ main{flex:1;position:relative;min-width:0;background:var(--sc-low);border-radius
 .locpath.custom{color:var(--primary)}
 .icons{display:flex;gap:8px;flex-wrap:wrap}
 .ico{min-width:44px;height:44px;padding:0 10px;border-radius:14px;border:1px solid var(--outline-v);background:none;color:var(--on-surface);cursor:pointer;font-size:20px;transition:background var(--d1),border-color var(--d1),transform var(--d2) var(--e-spring)}
-.ico:hover{transform:scale(1.1)}.ico:active{transform:scale(.92)}
+.ico:hover{background:color-mix(in srgb,var(--on-surface) 8%,transparent)}
+.ico:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.instance-symbol{width:26px;height:26px;display:block;flex:none;fill:none}
+.ico{display:grid;place-items:center}
+.ic .instance-symbol{width:60%;height:60%}
+#heroArt .instance-symbol{width:55%;height:55%}
 .ico.on{background:var(--primary-c);border-color:var(--primary);color:var(--on-primary-c)}
 .ico:first-child{font-size:13px}
 .hues{display:flex;gap:10px}

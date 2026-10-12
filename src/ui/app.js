@@ -29,8 +29,7 @@ addEventListener('unhandledrejection', (e) => e.reason && e.reason.handled && e.
 
 const hue = (id) => [...String(id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)
 const loaderName = (i) => (i.loader === 'fabric' ? 'Fabric' + (i.loaderVersion ? ' ' + i.loaderVersion : '') : 'Vanilla')
-const glyphText = (i) => (i.icon && [...i.icon].length <= 2 ? i.icon : [...(i.name || '?')][0].toUpperCase())
-const glyph = (i) => esc(glyphText(i))
+const glyph = (i) => instanceIconKey(i.icon) ? instanceIconSvg(instanceIconKey(i.icon)) : esc([...(i.name || '?')][0].toUpperCase())
 const avatar = (a) => `https://mc-heads.net/avatar/${a && a.type === 'microsoft' ? a.id : a ? a.name : 'Steve'}/64`
 const curInst = () => S.instances.find((i) => i.id === S.selectedInstance) || S.instances[0]
 const instById = (id) => S.instances.find((i) => i.id === id)
@@ -120,7 +119,7 @@ function renderHero(animate) {
     $('#heroName').textContent = i.name
     $('#heroChip').textContent = `${i.mc} · ${loaderName(i)}`
     $('#heroMeta').textContent = acc ? t('play.playingAs', { name: acc.name }) : t('play.noAccount')
-    art.textContent = glyphText(i)
+    art.innerHTML = glyph(i)
   }
   if (animate) {
     flash($('.hero-info'), 'swap')

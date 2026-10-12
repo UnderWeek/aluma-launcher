@@ -34,6 +34,24 @@ const ICON = {
 }
 const ic = (n, cls = '') => n === 'logo' ? `<img class="brand-icon ${cls}" src="assets/aluma-icon.svg" alt="Aluma Launcher" draggable="false">` : `<svg class="${cls}" viewBox="0 0 24 24"><path d="${ICON[n]}"/></svg>`
 
+// Shared vector artwork for instance settings, cards and the play screen.
+const INSTANCE_ICONS = {
+  pickaxe: 'M4 7c4-4 10-4 16 0l-3 3-4-4M13 6 4 20',
+  tree: 'M12 3 6 10h3l-5 7h16l-5-7h3L12 3ZM12 17v4',
+  swords: 'm4 3 6 4 7 9-2 2-9-7-2-8ZM14 7l6-4-2 8-3 3M5 15l4 4M15 15l4 4M7 17l-3 3M17 17l3 3',
+  bricks: 'M3 5h18v14H3ZM3 12h18M9 5v7M15 12v7',
+  flame: 'M12 3c1 5-5 6-5 10 0 3 2 6 5 6s6-2 6-6c0-2-1-4-3-6 0 3-1 4-2 4 1-3 0-6-1-8ZM12 14c-3 3-2 6 0 6s3-3 0-6Z',
+  diamond: 'm3 8 5-4h8l5 4-9 13L3 8ZM3 8h18M8 4l4 17 4-17',
+  dragon: 'm4 17 4-1 2-6 5-4 5 3-2 4-5 1-2 5H6l-3-4M15 6l1-3 3 4M16 10h.01M10 10 5 8l2 6',
+  stars: 'm14 3 2 6 5 2-5 2-2 6-2-6-5-2 5-2 2-6ZM5 3v4M3 5h4M5 16v5M3 18.5h4',
+  apple: 'M12 7c-6-5-11 1-8 8 2 6 5 6 8 4 3 2 6 2 8-4 3-7-2-13-8-8ZM12 7V4l3-2',
+  rocket: 'M9 15c-1-6 4-11 11-11 0 7-5 12-11 11ZM9 9H5l-2 6h6M15 15v4l-6 2v-6M6 18l-3 3M14 8h.01',
+  crown: 'm3 6 4 4 5-6 5 6 4-4-2 12H5L3 6ZM5 15h14'
+}
+const LEGACY_INSTANCE_ICONS = { '⛏': 'pickaxe', '🌲': 'tree', '⚔': 'swords', '🧱': 'bricks', '🔥': 'flame', '💎': 'diamond', '🐉': 'dragon', '🌌': 'stars', '🍎': 'apple', '🚀': 'rocket', '👑': 'crown' }
+const instanceIconKey = value => LEGACY_INSTANCE_ICONS[value] || (Object.hasOwn(INSTANCE_ICONS, value) ? value : '')
+const instanceIconSvg = key => `<svg class="instance-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${INSTANCE_ICONS[key]}"/></svg>`
+
 const motionOff = () => document.body.dataset.motion === 'off'
 const spd = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--spd')) || 1
 const ms = (n) => (motionOff() ? 0 : n * spd())
