@@ -1,6 +1,7 @@
 const browseState = { kind: 'mods', source: 'modrinth', sort: 'relevance', offset: 0, total: 0, hits: [], seq: 0, loading: false }
 const selectedMods = new Map()
 const installedMods = new Set()
+const selectionCheck = { busy: false, failed: false, message: '', seq: 0 }
 const batchInstall = { busy: false, key: null, pct: 0, stage: '' }
 let bTimer = null
 
@@ -40,14 +41,16 @@ function updateBatchBar() {
   const button = $('#bDownload')
   const blocked = !canInstallMods()
   $('#bSelected').textContent = batchInstall.busy ? t('browse.batchProgress', { pct: Math.round(batchInstall.pct * 100) }) : blocked && instById($('#bInst').value) ? t('err.mods.noLoader') : t('browse.selectedCount', { n: selectedMods.size })
-  button.disabled = batchInstall.busy || !selectedMods.size || blocked
+  button.disabled = batchInstall.busy || selectionCheck.busy || selectionCheck.failed || !selectedMods.size || blocked
   button.innerHTML = ic('download') + esc(t('browse.downloadSelected'))
   $('#bCancel').classList.toggle('hidden', !batchInstall.busy)
   $('#bClear').disabled = batchInstall.busy || !selectedMods.size
   $('#bBatchProgress').style.width = Math.round(batchInstall.pct * 100) + '%'
   $('#bBatchProgress').parentElement.classList.toggle('hidden', !batchInstall.busy)
-  $('#bBatchStatus').textContent = batchInstall.busy ? stageText({ stage: batchInstall.stage, arg: batchInstall.arg }) : ''
-  $('#bBatchStatus').classList.toggle('hidden', !batchInstall.busy)
+  $('#bBatchStatus').textContent = batchInstall.busy ? stageText({ stage: batchInstall.stage, arg: batchInstall.arg }) : selectionCheck.busy ? t('mods.resolving') : selectionCheck.message
+  $('#bBatchStatus').classList.toggle('hidden', !batchInstall.busy && !selectionCheck.busy && !selectionCheck.message)
+  $('#bBatchStatus').title = selectionCheck.message
+  $('#bBatchBar').classList.toggle('preflight-error', selectionCheck.failed)
   $('#browseBar').inert = batchInstall.busy
   $$('#browseBar select, #bKind button, #bSource button').forEach(el => { el.disabled = batchInstall.busy })
   $$('.mod-row input').forEach(el => { el.disabled = batchInstall.busy || installedMods.has(el.closest('.mod-row').dataset.k) || blocked })
@@ -55,6 +58,8 @@ function updateBatchBar() {
 
 function clearSelection() {
   closeModDetails()
+  selectionCheck.seq++
+  Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
   selectedMods.clear()
   installedMods.clear()
   updateBatchBar()
@@ -145,7 +150,7 @@ $('#bResults').onchange = event => {
   if (input.checked) selectedMods.set(modKey(hit), hit)
   else selectedMods.delete(modKey(hit))
   row.classList.toggle('selected', input.checked)
-  updateBatchBar()
+  checkSelectedMods()
 }
 $('#bResults').onclick = event => {
   if (event.target.closest('#more')) return browseSearch(false)
@@ -160,13 +165,15 @@ $('#bResults').onkeydown = event => {
   }
 }
 $('#bClear').onclick = () => {
+  selectionCheck.seq++
+  Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
   selectedMods.clear()
   $$('.mod-row').forEach(row => { row.classList.remove('selected'); $('input', row).checked = false })
   updateBatchBar()
 }
 $('#bCancel').onclick = () => batchInstall.key && api.modsCancel(batchInstall.key)
 $('#bDownload').onclick = async () => {
-  if (batchInstall.busy || !selectedMods.size || !canInstallMods()) return
+  if (batchInstall.busy || selectionCheck.busy || selectionCheck.failed || !selectedMods.size || !canInstallMods()) return
   const target = instById($('#bInst').value)
   const selected = [...selectedMods.values()]
   const key = 'batch:' + target.id + ':' + Date.now()
@@ -300,3 +307,27 @@ async function openModDetails(hit) {
   }
 }
 addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#bDetail').hidden) closeModDetails() })
+
+
+async function checkSelectedMods() {
+  const seq = ++selectionCheck.seq
+  Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
+  if (!selectedMods.size || browseState.source !== 'modrinth') return updateBatchBar()
+  selectionCheck.busy = true
+  updateBatchBar()
+  try {
+    const response = await api.modsCheckSelection({ instId: $('#bInst').value, kind: browseState.kind, source: browseState.source, items: [...selectedMods.values()].map(hit => ({ id: hit.id })) })
+    if (seq !== selectionCheck.seq) return
+    selectionCheck.failed = !response.ok
+    if (!response.ok) selectionCheck.message = errFrom(response.code, response.params, response.error)
+  } catch (error) {
+    if (seq !== selectionCheck.seq) return
+    selectionCheck.failed = true
+    selectionCheck.message = error.message
+  } finally {
+    if (seq === selectionCheck.seq) {
+      selectionCheck.busy = false
+      updateBatchBar()
+    }
+  }
+}

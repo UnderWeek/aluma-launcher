@@ -5,7 +5,7 @@ const os = require('os')
 const crypto = require('crypto')
 const AdmZip = require('adm-zip')
 const U = require('../src/core/util')
-const { installMany } = require('../src/core/modrinth-install')
+const { installMany, checkMany } = require('../src/core/modrinth-install')
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'aluma-mods-test-'))
 const original = { fetch: U.fetchJson, download: U.download, rename: fs.promises.rename }
@@ -66,6 +66,23 @@ U.download = async (url, dest, opts) => {
 const install = (i, ids, progress) => installMany(i, 'mods', ids, progress, controller.signal)
 
 async function run() {
+  reset()
+  add(makeVersion('a', 'a1', [dependency('b')]))
+  add(makeVersion('b', 'b1', [dependency('a')]))
+  const preview = instance('preview')
+  assert.deepEqual((await checkMany(preview, 'mods', ['a'])).projects.sort(), ['a', 'b'])
+  assert.equal(fs.existsSync(preview.dir), false, 'Preflight must not create files')
+  assert.deepEqual(downloaded, [], 'Preflight must not download binaries')
+
+  reset()
+  add(makeVersion('a', 'a1', [dependency('forge'), dependency('b')]))
+  add(makeVersion('forge', 'forge1', [], { loaders: ['neoforge'] }))
+  projects.forge.loaders = ['forge', 'neoforge']
+  add(makeVersion('b', 'b1'))
+  assert.deepEqual((await checkMany(instance('multi-loader'), 'mods', ['a'])).projects.sort(), ['a', 'b'])
+  versions.b1.game_versions = ['1.20.1']
+  await assert.rejects(checkMany(instance('unavailable-dependency'), 'mods', ['a']), e => e.code === 'mods.noProjectFile' && e.params.name === 'B')
+
   reset()
   add(makeVersion('a', 'a1', [dependency('b')]))
   add(makeVersion('b', 'b1', [dependency('c')]))

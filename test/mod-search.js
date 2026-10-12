@@ -15,6 +15,10 @@ async function run() {
       offsets.push(offset)
       return { total_hits: 4, hits: (offset === 0 ? ['wrong', 'server'] : ['good', 'empty']).map(project_id => ({ project_id, title: project_id, slug: project_id })) }
     }
+    if (!parsed.pathname.endsWith('/version')) {
+      const id = parsed.pathname.split('/')[3]
+      return { id, title: id }
+    }
     assert.equal(parsed.searchParams.get('game_versions'), '["26.3"]')
     assert.equal(parsed.searchParams.get('loaders'), '["fabric"]')
     const id = parsed.pathname.split('/')[3]
@@ -32,6 +36,18 @@ async function run() {
     assert.equal(compatibleVersion(file, target), true)
     assert.equal(compatibleVersion({ ...file, environment: 'dedicated_server_only' }, target), false)
     assert.equal(compatibleVersion({ ...file, loaders: ['minecraft'] }, { ...target, kind: 'resourcepacks' }), true)
+    let foreign = false
+    U.fetchJson = async url => {
+      const parsed = new URL(url)
+      if (parsed.pathname.endsWith('/search')) return { total_hits: 1, hits: [{ project_id: 'root', title: 'Root', slug: 'root' }] }
+      const id = parsed.pathname.split('/')[3]
+      if (!parsed.pathname.endsWith('/version')) return { id, title: id, loaders: id === 'dep' && foreign ? ['neoforge'] : ['fabric'] }
+      if (id === 'root') return [{ ...file, id: 'root-v', project_id: 'root', dependencies: [{ dependency_type: 'required', project_id: 'dep' }] }]
+      return []
+    }
+    assert.equal((await M.search({ source: 'modrinth', ...target })).hits.length, 0, 'Hide roots with unavailable required dependencies')
+    foreign = true
+    assert.equal((await M.search({ source: 'modrinth', ...target })).hits.length, 1, 'Exclude dependencies of another loader from multi-loader releases')
     console.log('Mod search: exact client compatibility, false positives, files and pagination: OK')
   } finally { U.fetchJson = original }
 }

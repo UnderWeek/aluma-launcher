@@ -437,3 +437,5 @@ body[data-motion="off"] .mod-detail{animation:none}
 .mod-detail-tabs .btn{flex:1;min-width:0;padding:0 12px;font-size:13px;white-space:nowrap}
 .minecraft-versions{margin:0;gap:8px}
 .minecraft-versions span{padding:6px 10px}
+
+.batch-bar.preflight-error .batch-meta .label{max-width:360px;white-space:normal;color:var(--error)}

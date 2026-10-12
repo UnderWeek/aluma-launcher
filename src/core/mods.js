@@ -78,16 +78,21 @@ async function search({ source, kind, query, mc, loader, sort, offset = 0, limit
   const facets = [[`project_type:${k.mr}`]]
   if (mc) facets.push([`versions:${mc}`])
   if (k.loader && loader && loader !== 'vanilla') facets.push([`categories:${loader}`])
-  const target = { kind, mc, loader }
   let r, hits, nextOffset = offset
-  // Search facets describe a whole project; verify an actual client file.
+  const cache = new Map()
+  // Resolve required dependencies with the same planner used for installation.
   for (let page = 0; page < 5; page++) {
     const q = new URLSearchParams({ query: query || '', limit, offset: nextOffset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
     r = await mr('/search?' + q)
     const available = new Map()
     await U.pool(r.hits, 6, async h => {
-      const versions = await U.fetchJson(MR + '/project/' + encodeURIComponent(h.project_id) + '/version?' + versionQuery(target), { signal: AbortSignal.timeout(30000) })
-      available.set(h.project_id, versions.some(v => compatibleVersion(v, target)))
+      try {
+        await require('./modrinth-install').checkMany({ mc, loader, id: 'catalog' }, kind, [h.project_id], { catalog: true, cache })
+        available.set(h.project_id, true)
+      } catch (error) {
+        if (!['mods.noProjectFile', 'mods.noLoader', 'mods.dependency', 'mods.conflict'].includes(error.code)) throw error
+        available.set(h.project_id, false)
+      }
     })
     nextOffset += r.hits.length
     hits = r.hits.filter(h => available.get(h.project_id))
@@ -231,6 +236,12 @@ function installMany({ instId, kind, source, items }, onProgress = () => {}, sig
   }, signal)
 }
 
+function checkSelection({ instId, kind, source, items }) {
+  if (!Array.isArray(items) || !items.length || items.length > 100 || items.some(item => !item || typeof item.id !== 'string')) throw new LErr('mods.selection')
+  if (source !== 'modrinth') return { projects: items.map(item => item.id) }
+  return require('./modrinth-install').checkMany(inst(instId), kind, [...new Set(items.map(item => item.id))])
+}
+
 function meta(zipPath) {
   try {
     const z = new AdmZip(zipPath)
@@ -310,4 +321,4 @@ async function openDir(instId, kind) {
   return d
 }
 
-module.exports = { search, details, install, list, toggle, remove, openDir, testCurseforge, installMany }
+module.exports = { search, details, install, list, toggle, remove, openDir, testCurseforge, installMany, checkSelection }

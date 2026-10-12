@@ -12,12 +12,12 @@ const safeFile = (name) => {
   return name
 }
 
-async function installMany(instance, kind, ids, progress = () => {}, signal) {
+async function installMany(instance, kind, ids, progress = () => {}, signal, options = {}) {
   if (!['mods', 'resourcepacks', 'shaderpacks'].includes(kind)) throw new LErr('mods.selection')
   const mods = kind === 'mods'
   if (mods && instance.loader === 'vanilla') throw new LErr('mods.noLoader')
   const check = () => { if (signal && signal.aborted) throw U.abortErr() }
-  const cache = new Map()
+  const cache = options.cache || new Map()
   const request = (url) => {
     check()
     if (!cache.has(url)) cache.set(url, U.fetchJson(MR + url, { signal }))
@@ -31,7 +31,9 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
   const directory = path.join(C.gameDir(instance), { mods: 'mods', resourcepacks: 'resourcepacks', shaderpacks: 'shaderpacks' }[kind])
   const trackPath = path.join(root, 'installed.json')
   let track = {}
-  try { track = await U.readJson(trackPath) } catch (e) { if (e.code !== 'ENOENT') throw e }
+  if (!options.catalog) {
+    try { track = await U.readJson(trackPath) } catch (e) { if (e.code !== 'ENOENT') throw e }
+  }
   const bucket = track[kind] || {}
   const existing = new Map()
   for (const [file, meta] of Object.entries(bucket)) {
@@ -80,15 +82,22 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
       for (const dep of selected.dependencies || []) {
         if (dep.dependency_type !== 'required') continue
         let target = dep.project_id
+        let pinned
         if (dep.version_id) {
-          const pinned = await version(dep.version_id)
+          pinned = await version(dep.version_id)
           if (target && target !== pinned.project_id) throw new LErr('mods.dependency', { name: id })
           target = pinned.project_id
+        }
+        if (!target) throw new LErr('mods.dependency', { name: dep.file_name || id })
+        // Some multi-loader releases declare dependencies for every loader.
+        // Exclude a dependency belonging exclusively to another loader.
+        const info = await project(target)
+        if (mods && info.loaders?.length && !info.loaders.includes(instance.loader) && info.loaders.some(loader => ['fabric', 'quilt', 'forge', 'neoforge'].includes(loader))) continue
+        if (pinned) {
           if (!compatible(pinned)) throw await noFile(target)
           if (!pins.has(target)) pins.set(target, new Set())
           pins.get(target).add(pinned.id)
         }
-        if (!target) throw new LErr('mods.dependency', { name: dep.file_name || id })
         queue.push(target)
       }
     }
@@ -117,6 +126,7 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
     resolved = nodes
     break
   }
+  if (options.checkOnly) return { projects: [...resolved.keys()], versions: [...resolved.values()].map(v => v.id) }
   const plan = []
   const names = new Map()
   for (const [id, selected] of resolved) {
@@ -213,4 +223,5 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
   }
 }
 
-module.exports = { installMany }
+const checkMany = (instance, kind, ids, options = {}) => installMany(instance, kind, ids, () => {}, AbortSignal.timeout(60000), { ...options, checkOnly: true })
+module.exports = { installMany, checkMany }
