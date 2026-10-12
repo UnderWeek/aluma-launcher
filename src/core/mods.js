@@ -221,11 +221,6 @@ function installMany({ instId, kind, source, items }, onProgress = () => {}, sig
   }, signal)
 }
 
-function checkSelection({ instId, kind, source, items }) {
-  if (!Array.isArray(items) || !items.length || items.length > 100 || items.some(item => !item || typeof item.id !== 'string')) throw new LErr('mods.selection')
-  if (source !== 'modrinth') return { projects: items.map(item => item.id) }
-  return require('./modrinth-install').checkMany(inst(instId), kind, [...new Set(items.map(item => item.id))])
-}
 
 function meta(zipPath) {
   try {
@@ -306,4 +301,4 @@ async function openDir(instId, kind) {
   return d
 }
 
-module.exports = { search, details, install, list, toggle, remove, openDir, testCurseforge, installMany, checkSelection }
+module.exports = { search, details, install, list, toggle, remove, openDir, testCurseforge, installMany }

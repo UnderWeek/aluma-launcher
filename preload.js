@@ -27,7 +27,6 @@ contextBridge.exposeInMainWorld('launcher', {
   stop: call('stop'),
   modsSearch: call('mods:search'),
   modsDetails: call('mods:details'),
-  modsCheckSelection: call('mods:checkSelection'),
   modsList: call('mods:list'),
   modsToggle: call('mods:toggle'),
   modsRemove: call('mods:remove'),
