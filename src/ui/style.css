@@ -433,3 +433,7 @@ input:checked+.sw::after{left:calc(100% - 26px);width:24px;height:24px;backgroun
 body[data-motion="off"] .mod-detail{animation:none}
 
 .mod-detail-scroll{user-select:text}
+
+.mod-detail-tabs .btn{flex:1;min-width:0;padding:0 12px;font-size:13px;white-space:nowrap}
+.minecraft-versions{margin:0;gap:8px}
+.minecraft-versions span{padding:6px 10px}
