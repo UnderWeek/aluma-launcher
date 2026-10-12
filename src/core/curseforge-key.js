@@ -2,7 +2,7 @@ const { inflateSync } = require('zlib')
 const H = require('./http')
 const { LErr } = require('./errors')
 
-// Pinned AppImage and SquashFS zlib block used by Freesm Launcher.
+// Pinned AppImage and SquashFS zlib block for CurseForge API configuration.
 // A different AppImage version requires new offsets.
 const URL = 'https://curseforge.overwolf.com/electron/linux/CurseForge-0.198.1-21.AppImage'
 const START = 82926761

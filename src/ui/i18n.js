@@ -100,7 +100,7 @@ const D = {
   'inst.title': ['Сборки', 'Instances', 'Збірки', 'Instanzen', 'Instancias', '实例'],
   'inst.new': ['Новая сборка', 'New instance', 'Нова збірка', 'Neue Instanz', 'Nueva instancia', '新建实例'],
   'inst.empty': ['Сборок пока нет', 'No instances yet', 'Збірок поки немає', 'Noch keine Instanzen', 'Aún no hay instancias', '还没有实例'],
-  'inst.emptyHint': ['Каждая сборка живёт в своей папке — как в Prism', 'Every instance lives in its own folder, just like Prism', 'Кожна збірка живе у своїй папці — як у Prism', 'Jede Instanz liegt in einem eigenen Ordner, wie bei Prism', 'Cada instancia vive en su propia carpeta, como en Prism', '每个实例都有自己的文件夹，和 Prism 一样'],
+  'inst.emptyHint': ['У каждой сборки своя папка с модами, мирами и настройками', 'Each instance has its own folder for mods, worlds and settings', 'Кожна збірка має власну папку з модами, світами та налаштуваннями', 'Jede Instanz hat einen eigenen Ordner für Mods, Welten und Einstellungen', 'Cada instancia tiene su propia carpeta para mods, mundos y ajustes', '每个实例都有独立的文件夹，用于存放模组、世界和设置'],
   'inst.selected': ['Выбрана', 'Selected', 'Обрана', 'Ausgewählt', 'Seleccionada', '已选中'],
   'inst.settings': ['Настройки', 'Settings', 'Налаштування', 'Einstellungen', 'Ajustes', '设置'],
   'inst.name': ['Название', 'Name', 'Назва', 'Name', 'Nombre', '名称'],
