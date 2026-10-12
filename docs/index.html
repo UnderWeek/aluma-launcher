@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Aluma Launcher is an independent Minecraft: Java Edition launcher with separate instances, Fabric support, and mod browsing. Currently in development.">
+  <meta name="theme-color" content="#101915">
+  <title>Aluma Launcher — A home for your Minecraft worlds</title>
+  <link rel="icon" type="image/svg+xml" href="assets/aluma-icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="wrap nav">
+    <a class="brand" href="#"><img src="assets/aluma-icon.svg" alt="" width="36" height="36">Aluma Launcher</a>
+    <nav aria-label="Main navigation"><a href="#features">Features</a><a href="#project">Project</a><a href="https://github.com/UnderWeek/aluma-launcher">GitHub ↗</a></nav>
+  </header>
+  <main>
+    <section class="wrap hero">
+      <div class="hero-copy">
+        <span class="eyebrow"><span class="dot"></span> Independent launcher · In development</span>
+        <h1>A home for your<br><span>Minecraft worlds.</span></h1>
+        <p class="intro">Different versions. Different mods. Your own space for every adventure. Meet Aluma, a simple launcher for Minecraft: Java Edition.</p>
+        <div class="actions"><a class="button" href="https://github.com/UnderWeek/aluma-launcher">Explore the project <span>↗</span></a><a class="text-link" href="#preview">Take a look ↓</a></div>
+        <p class="platforms">Built with Electron · Windows, macOS & Linux targets</p>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="orbit"></div><img src="assets/aluma-icon.svg" alt="" width="256" height="256"><span class="art-caption">A little momentum.<br>A new adventure.</span></div>
+    </section>
+    <section class="wrap preview" id="preview" aria-label="Launcher preview">
+      <div class="preview-head"><span class="eyebrow">Inside Aluma</span><span class="muted">Development preview / demo instance</span></div>
+      <img class="screenshot" src="assets/launcher-preview.png" alt="Aluma Launcher dark interface showing a demo Vanilla Minecraft instance, Play button, and navigation for instances, mods, accounts, and settings." width="1240" height="780" loading="lazy">
+    </section>
+    <section class="wrap features" id="features">
+      <div class="section-title"><span class="eyebrow">Room to make it yours</span><h2>One launcher.<br>Many ways to play.</h2></div>
+      <div class="cards">
+        <article><span class="number">01 / INSTANCES</span><h3>Keep worlds separate.</h3><p>Give each instance its own mods, saves, and settings. Switch between Minecraft versions without mixing your files.</p></article>
+        <article><span class="number">02 / MODDING</span><h3>Find your next favourite.</h3><p>Start with Vanilla or Fabric. Browse Modrinth and CurseForge, install mods, and manage them from the launcher.</p></article>
+        <article><span class="number">03 / YOUR SPACE</span><h3>Feel at home.</h3><p>Choose light or dark mode, your accent colour, language, and game settings. User data stays together in your .aluma folder.</p></article>
+      </div>
+    </section>
+    <section class="wrap project" id="project">
+      <div><span class="eyebrow">Made in the open</span><h2>A small project.<br>A clear direction.</h2></div>
+      <div class="project-copy"><p>Aluma Launcher is developed by <a href="https://github.com/UnderWeek">UnderWeek</a>. The source code is public, and feedback is welcome.</p><p>Aluma is currently in development. Packaged downloads are not available yet. Microsoft account sign-in is implemented; Minecraft Services API approval is pending before online account access can work.</p><p>Authentication takes place on Microsoft's sign-in page. Aluma uses the resulting tokens to request the Minecraft profile and launch the game; it does not collect your Microsoft password.</p><div class="actions"><a class="button secondary" href="https://github.com/UnderWeek/aluma-launcher">Source code ↗</a><a class="text-link" href="https://github.com/UnderWeek/aluma-launcher/issues">Contact & feedback ↗</a></div></div>
+    </section>
+  </main>
+  <footer class="wrap"><div class="footer-line"><a class="brand" href="#"><img src="assets/aluma-icon.svg" alt="" width="28" height="28">Aluma Launcher</a><span class="muted">Built for the next adventure.</span></div><p>Not an official Minecraft product. Not affiliated with or approved by Mojang or Microsoft. Minecraft is a trademark of its respective owners.</p></footer>
+</body>
+</html>

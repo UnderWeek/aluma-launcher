@@ -1,0 +1,20 @@
+function openCreateFromEmpty() {}
+
+;(async () => {
+  S = await call(api.state())
+  if (S.platform === 'darwin') document.body.classList.add('mac')
+  initLang(S.settings.language)
+  $('#logo').innerHTML = ic('logo')
+  applyIcons()
+  applyI18n()
+  enhance(document)
+  applyTheme()
+  renderAll()
+  browseSync()
+  const first = $('.nav[data-page=play]')
+  first.classList.add('active')
+  $('#page-play').classList.add('active')
+  stagger($('#page-play'))
+  document.body.classList.add('ready')
+  if (!S.settings.setupDone) openSetup(false)
+})()

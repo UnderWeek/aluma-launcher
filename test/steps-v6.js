@@ -1,0 +1,17 @@
+module.exports = async ({ ev, shot, sleep }) => {
+  await sleep(800)
+  await ev(`document.querySelector('.nav[data-page=instances]').click()`)
+  await sleep(900)
+  await shot('v6-full')
+  await ev(`(()=>{S.instances=[];renderInstances()})()`)
+  await sleep(700)
+  await shot('v6-empty')
+  await ev(`(()=>{const b=document.querySelector('#instList .btn');const r=b.getBoundingClientRect();window.__w=r.width;const o={clientX:r.left+10,clientY:r.top+10,bubbles:true};b.dispatchEvent(new PointerEvent('pointerdown',o))})()`)
+  await sleep(200)
+  await shot('v6-empty-press')
+  console.log('width before/after', await ev(`window.__w+' '+document.querySelector('#instList .btn').getBoundingClientRect().width`))
+  await sleep(800)
+  await ev(`(()=>{const i=document.querySelector('#instSearch');i.focus();i.value='abc';i.dispatchEvent(new Event('input'))})()`)
+  await sleep(500)
+  await shot('v6-search')
+}

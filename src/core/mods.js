@@ -1,0 +1,284 @@
+const fs = require('fs')
+const path = require('path')
+const AdmZip = require('adm-zip')
+const C = require('./config')
+const U = require('./util')
+const H = require('./http')
+const K = require('./keys')
+const { LErr } = require('./errors')
+
+const KINDS = {
+  mods: { dir: 'mods', mr: 'mod', cf: 6, loader: true },
+  resourcepacks: { dir: 'resourcepacks', mr: 'resourcepack', cf: 12, loader: false },
+  shaderpacks: { dir: 'shaderpacks', mr: 'shader', cf: 6552, loader: false }
+}
+const MR = 'https://api.modrinth.com/v2'
+const CF = 'https://api.curseforge.com/v1'
+const CF_LOADER = { forge: 1, fabric: 4, quilt: 5, neoforge: 6 }
+
+const kindOf = (k) => KINDS[k] || KINDS.mods
+const inst = (id) => {
+  const i = C.get().instances.find((x) => x.id === id)
+  if (!i) throw new LErr('inst.notFound')
+  return i
+}
+const targetDir = (i, kind) => path.join(C.gameDir(i), kindOf(kind).dir)
+const trackFile = (i) => path.join(C.instanceRoot(i), 'installed.json')
+
+async function readTrack(i) {
+  try {
+    return await U.readJson(trackFile(i))
+  } catch {
+    return {}
+  }
+}
+const writeTrack = (i, t) => U.writeJson(trackFile(i), t)
+
+const mr = (p) => U.fetchJson(MR + p)
+async function cf(p, keyOverride) {
+  const key = keyOverride === undefined ? (C.get().settings.curseforgeKey || '').trim() || K.curseforge : keyOverride
+  if (!key) throw new LErr('cf.noKey')
+  const r = await H.fetch(CF + p, { headers: { 'x-api-key': key, Accept: 'application/json', 'User-Agent': U.UA }, signal: AbortSignal.timeout(30000) })
+  if (r.status === 401 || r.status === 403) throw new LErr('cf.badKey')
+  if (!r.ok) throw new LErr('http', { status: r.status, url: CF + p }, `HTTP ${r.status}`)
+  return r.json()
+}
+
+async function testCurseforge(key) {
+  await cf('/mods/search?gameId=432&classId=6&pageSize=1', key)
+  return true
+}
+
+const MR_SORT = { relevance: 'relevance', downloads: 'downloads', updated: 'updated', newest: 'newest' }
+const CF_SORT = { relevance: 1, downloads: 6, updated: 3, newest: 11 }
+
+async function search({ source, kind, query, mc, loader, sort, offset = 0, limit = 20 }) {
+  const k = kindOf(kind)
+  if (source === 'curseforge') {
+    const q = new URLSearchParams({ gameId: 432, classId: k.cf, pageSize: limit, index: offset, sortOrder: 'desc', sortField: CF_SORT[sort] || 2 })
+    if (query) q.set('searchFilter', query)
+    if (mc) q.set('gameVersion', mc)
+    if (k.loader && CF_LOADER[loader]) q.set('modLoaderType', CF_LOADER[loader])
+    const r = await cf('/mods/search?' + q)
+    return {
+      total: r.pagination.totalCount,
+      hits: r.data.map((m) => ({
+        id: String(m.id),
+        source: 'curseforge',
+        title: m.name,
+        author: (m.authors[0] || {}).name || '',
+        description: m.summary,
+        icon: m.logo ? m.logo.thumbnailUrl : '',
+        downloads: m.downloadCount,
+        url: (m.links || {}).websiteUrl || ''
+      }))
+    }
+  }
+  const facets = [[`project_type:${k.mr}`]]
+  if (mc) facets.push([`versions:${mc}`])
+  if (k.loader && loader && loader !== 'vanilla') facets.push([`categories:${loader}`])
+  const q = new URLSearchParams({ query: query || '', limit, offset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
+  const r = await mr('/search?' + q)
+  return {
+    total: r.total_hits,
+    hits: r.hits.map((h) => ({
+      id: h.project_id,
+      source: 'modrinth',
+      title: h.title,
+      author: h.author,
+      description: h.description,
+      icon: h.icon_url || '',
+      downloads: h.downloads,
+      url: `https://modrinth.com/${k.mr}/${h.slug}`
+    }))
+  }
+}
+
+const baseName = (n) => path.basename(String(n))
+function safeFile(name) {
+  const b = baseName(name)
+  if (!b || b !== name || b.startsWith('.')) throw new LErr('mods.badName')
+  return b
+}
+
+async function dropOld(i, kind, projectId, keep) {
+  const t = await readTrack(i)
+  const dir = targetDir(i, kind)
+  const bucket = (t[kind] = t[kind] || {})
+  for (const [file, meta] of Object.entries(bucket)) {
+    if (meta.projectId === projectId && file !== keep) {
+      await fs.promises.rm(path.join(dir, file), { force: true })
+      await fs.promises.rm(path.join(dir, file + '.disabled'), { force: true })
+      delete bucket[file]
+    }
+  }
+  await writeTrack(i, t)
+}
+
+async function remember(i, kind, file, meta) {
+  const t = await readTrack(i)
+  ;(t[kind] = t[kind] || {})[file] = meta
+  await writeTrack(i, t)
+}
+
+async function installModrinth(i, kind, projectId, onProgress, signal, depth) {
+  const k = kindOf(kind)
+  const q = new URLSearchParams()
+  q.set('game_versions', JSON.stringify([i.mc]))
+  if (k.loader && i.loader !== 'vanilla') q.set('loaders', JSON.stringify([i.loader]))
+  const [list, proj] = await Promise.all([mr(`/project/${projectId}/version?${q}`), mr(`/project/${projectId}`)])
+  if (!list.length) throw new LErr('mods.noFile', { mc: i.mc, loader: i.loader })
+  const v = list.find((x) => x.version_type === 'release') || list[0]
+  const f = v.files.find((x) => x.primary) || v.files[0]
+  const file = safeFile(f.filename)
+  const dir = targetDir(i, kind)
+  onProgress({ stage: 'mods.downloading', arg: proj.title, pct: 0 })
+  let done = 0
+  await U.download(f.url, path.join(dir, file), {
+    sha1: f.hashes && f.hashes.sha1,
+    size: f.size,
+    signal,
+    onBytes: (n) => {
+      done += n
+      onProgress({ stage: 'mods.downloading', arg: proj.title, pct: f.size ? Math.min(1, done / f.size) : 0 })
+    }
+  })
+  await dropOld(i, kind, 'mr:' + projectId, file)
+  await remember(i, kind, file, { source: 'modrinth', projectId: 'mr:' + projectId, versionId: v.id, title: proj.title, version: v.version_number })
+  const installed = [{ title: proj.title, file }]
+  if (depth < 2 && k.loader) {
+    const t = await readTrack(i)
+    const have = new Set(Object.values(t[kind] || {}).map((m) => m.projectId))
+    for (const d of v.dependencies || []) {
+      if (d.dependency_type !== 'required' || !d.project_id || have.has('mr:' + d.project_id)) continue
+      try {
+        installed.push(...(await installModrinth(i, kind, d.project_id, onProgress, signal, depth + 1)))
+      } catch (e) {
+        if (e.name === 'AbortError') throw e
+      }
+    }
+  }
+  return installed
+}
+
+async function installCurseforge(i, kind, modId, title, onProgress, signal) {
+  const k = kindOf(kind)
+  const q = new URLSearchParams({ gameVersion: i.mc, pageSize: 50 })
+  if (k.loader && CF_LOADER[i.loader]) q.set('modLoaderType', CF_LOADER[i.loader])
+  const r = await cf(`/mods/${modId}/files?${q}`)
+  const files = r.data.sort((a, b) => (a.releaseType === 1 ? 0 : 1) - (b.releaseType === 1 ? 0 : 1) || new Date(b.fileDate) - new Date(a.fileDate))
+  if (!files.length) throw new LErr('mods.noFile', { mc: i.mc, loader: i.loader })
+  const f = files[0]
+  if (!f.downloadUrl) throw new LErr('cf.blocked', { title })
+  const file = safeFile(f.fileName)
+  const sha1 = (f.hashes.find((h) => h.algo === 1) || {}).value
+  let done = 0
+  await U.download(f.downloadUrl, path.join(targetDir(i, kind), file), {
+    sha1,
+    size: f.fileLength,
+    signal,
+    onBytes: (n) => {
+      done += n
+      onProgress({ stage: 'mods.downloading', arg: title, pct: f.fileLength ? Math.min(1, done / f.fileLength) : 0 })
+    }
+  })
+  await dropOld(i, kind, 'cf:' + modId, file)
+  await remember(i, kind, file, { source: 'curseforge', projectId: 'cf:' + modId, versionId: String(f.id), title, version: f.displayName })
+  return [{ title, file }]
+}
+
+async function install({ instId, kind, source, id, title }, onProgress = () => {}, signal) {
+  const i = inst(instId)
+  await fs.promises.mkdir(targetDir(i, kind), { recursive: true })
+  if (source !== 'curseforge') return { source, files: await installModrinth(i, kind, id, onProgress, signal, 0) }
+  try {
+    return { source, files: await installCurseforge(i, kind, id, title, onProgress, signal) }
+  } catch (e) {
+    if (e.code !== 'cf.blocked' || !C.get().settings.cfFallback) throw e
+    onProgress({ stage: 'mods.fallback', arg: title, pct: 0 })
+    const r = await search({ source: 'modrinth', kind, query: title, mc: i.mc, loader: i.loader, sort: 'relevance', limit: 5 })
+    const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '')
+    const hit = r.hits.find((h) => norm(h.title) === norm(title))
+    if (!hit) throw e
+    return { source: 'modrinth', fallback: true, files: await installModrinth(i, kind, hit.id, onProgress, signal, 0) }
+  }
+}
+
+function meta(zipPath) {
+  try {
+    const z = new AdmZip(zipPath)
+    const f = z.getEntry('fabric.mod.json')
+    if (f) {
+      const j = JSON.parse(f.getData().toString('utf8'))
+      return { name: j.name || j.id, version: j.version, description: j.description || '' }
+    }
+    const t = z.getEntry('META-INF/mods.toml') || z.getEntry('META-INF/neoforge.mods.toml')
+    if (t) {
+      const s = t.getData().toString('utf8')
+      const g = (k) => ((s.match(new RegExp(k + '\\s*=\\s*"([^"]*)"')) || [])[1] || '')
+      return { name: g('displayName'), version: g('version'), description: g('description') }
+    }
+  } catch {}
+  return {}
+}
+
+async function list(instId, kind) {
+  const i = inst(instId)
+  const dir = targetDir(i, kind)
+  const t = ((await readTrack(i))[kind]) || {}
+  let names = []
+  try {
+    names = await fs.promises.readdir(dir)
+  } catch {}
+  const out = []
+  for (const n of names) {
+    if (n.startsWith('.')) continue
+    const enabled = !n.endsWith('.disabled')
+    const real = enabled ? n : n.slice(0, -9)
+    if (!/\.(jar|zip)$/i.test(real)) continue
+    const st = await fs.promises.stat(path.join(dir, n)).catch(() => null)
+    if (!st || !st.isFile()) continue
+    const tr = t[real] || {}
+    const m = tr.title ? {} : /\.jar$/i.test(real) ? meta(path.join(dir, n)) : {}
+    out.push({
+      file: real,
+      enabled,
+      size: st.size,
+      title: tr.title || m.name || real.replace(/\.(jar|zip)$/i, ''),
+      version: tr.version || m.version || '',
+      description: m.description || '',
+      source: tr.source || ''
+    })
+  }
+  return out.sort((a, b) => a.title.localeCompare(b.title))
+}
+
+async function toggle(instId, kind, file, enable) {
+  const i = inst(instId)
+  const dir = targetDir(i, kind)
+  const f = safeFile(file)
+  const on = path.join(dir, f)
+  const off = on + '.disabled'
+  if (enable) await fs.promises.rename(off, on).catch(() => {})
+  else await fs.promises.rename(on, off).catch(() => {})
+}
+
+async function remove(instId, kind, file) {
+  const i = inst(instId)
+  const dir = targetDir(i, kind)
+  const f = safeFile(file)
+  await fs.promises.rm(path.join(dir, f), { force: true })
+  await fs.promises.rm(path.join(dir, f + '.disabled'), { force: true })
+  const t = await readTrack(i)
+  if (t[kind]) delete t[kind][f]
+  await writeTrack(i, t)
+}
+
+async function openDir(instId, kind) {
+  const i = inst(instId)
+  const d = targetDir(i, kind)
+  await fs.promises.mkdir(d, { recursive: true })
+  return d
+}
+
+module.exports = { search, install, list, toggle, remove, openDir, testCurseforge }

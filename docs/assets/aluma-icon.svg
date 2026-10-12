@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Aluma Launcher — cube comet</title>
+  <path fill="#B6F4DC" d="m160 24 72 42-72 42-72-42z"/>
+  <path fill="#51C6B4" d="m88 66 72 42v84l-72-42z"/>
+  <path fill="#797DE8" d="m160 108 72-42v84l-72 42z"/>
+  <path fill="#51C6B4" d="M48 156h28v28H48z"/>
+  <path fill="#B6F4DC" d="M16 208h24v24H16z"/>
+</svg>

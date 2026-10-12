@@ -1,0 +1,18 @@
+module.exports = async ({ ev, shot, sleep }) => {
+  await sleep(800)
+  const r = await ev(`(async()=>{const lv=(await api.fabricLoaders('1.21.1')).data[0].version;const r=await api.createInstance({name:'TMP_PACK',mc:'1.21.1',loader:'fabric',loaderVersion:lv,group:'Test',dir:'/Users/underweek/containers/mclauncher/data/custom/TmpPack'});return JSON.stringify(r).slice(0,200)})()`).catch(e=>'ERR '+e)
+  console.log('create', r)
+  await ev(`api.state().then(s=>{S=s.data||s;renderAll()})`).catch(e=>console.log('state err',e))
+  await sleep(600)
+  await ev(`document.querySelector('.nav[data-page=browse]').click()`)
+  await sleep(1500)
+  await ev(`(()=>{const s=document.querySelector('#bInst');const o=[...s.options].find(o=>/TMP_PACK/.test(o.textContent));console.log('opts',[...s.options].map(o=>o.textContent).join('|'));if(o){s.value=o.value;s.dispatchEvent(new Event('change'))}})()`)
+  await sleep(500)
+  await ev(`(()=>{const q=document.querySelector('#bQuery');q.value='sodium';q.dispatchEvent(new Event('input'))})()`)
+  await sleep(3500)
+  await shot('v4-browse-sodium')
+  await ev(`document.querySelector('#bResults .rcard [data-a=inst]')?.click()`)
+  await sleep(6000)
+  await shot('v4-installed')
+  console.log('files', await ev(`api.modsList(S.instances.find(i=>i.name==='TMP_PACK').id).then(r=>JSON.stringify(r).slice(0,300))`))
+}

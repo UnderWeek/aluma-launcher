@@ -1,0 +1,18 @@
+{
+  "name": "aluma-launcher",
+  "version": "1.0.0",
+  "description": "Aluma Launcher — Minecraft launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "undici": "^6.29.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "productName": "Aluma Launcher"
+}

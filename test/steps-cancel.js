@@ -1,0 +1,25 @@
+module.exports = async ({ ev, shot, sleep }) => {
+  const q = (s) => `document.querySelector('${s}')`
+  const r = await ev(`window.launcher.createInstance({ name: 'CANCEL_TEST', mc: '1.20.1', loader: 'vanilla' })`)
+  const id = r.data.selectedInstance
+  await ev(`window.launcher.state().then(async (s) => { window.location.reload() })`)
+  await sleep(1500)
+  await ev(`${q('#playBtn')}.click()`)
+  await sleep(6000)
+  console.log('during:', await ev(`${q('#playTxt')}.textContent + ' | ' + ${q('#progStage')}.textContent + ' ' + ${q('#progPct')}.textContent`))
+  await shot('40-downloading')
+  await ev(`${q('#playBtn')}.click()`)
+  await sleep(2500)
+  console.log('after cancel:', await ev(`${q('#playTxt')}.textContent`))
+  console.log('progress visible:', await ev(`${q('#prog')}.classList.contains('on')`))
+  console.log('toast:', await ev(`[...document.querySelectorAll('.snack')].map(e => e.textContent).join(',')`))
+  await shot('41-cancelled')
+  const st = await ev(`window.launcher.state()`)
+  console.log('running/preparing:', JSON.stringify(st.data.running), JSON.stringify(st.data.preparing))
+  await ev(`${q('#playBtn')}.click()`)
+  await sleep(3000)
+  console.log('restart:', await ev(`${q('#playTxt')}.textContent`))
+  await ev(`${q('#playBtn')}.click()`)
+  await sleep(2000)
+  await ev(`window.launcher.deleteInstance({ id: '${id}', wipe: true })`)
+}

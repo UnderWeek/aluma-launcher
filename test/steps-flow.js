@@ -1,0 +1,27 @@
+module.exports = async ({ ev, shot, sleep }) => {
+  await ev(`document.querySelector('#playBtn').click()`)
+  await sleep(2500)
+  await shot('10-modal-from-play')
+  await ev(`(()=>{const t=document.querySelector('#nType');t.value='release';t.dispatchEvent(new Event('change'))})()`)
+  await sleep(800)
+  await ev(`(()=>{const v=document.querySelector('#nVer');v.value='1.21.1';v.dispatchEvent(new Event('change'))})()`)
+  await ev(`document.querySelector('#nName').value='Тестовая сборка'`)
+  await ev(`document.querySelector('#nCreate').click()`)
+  await sleep(800)
+  await ev(`document.querySelector('.nav[data-page=accounts]').click()`)
+  await ev(`document.querySelector('#offName').value='Steve_Test'`)
+  await ev(`document.querySelector('#addOff').click()`)
+  await sleep(800)
+  await shot('11-accounts')
+  await ev(`document.querySelector('.nav[data-page=instances]').click()`)
+  await sleep(600)
+  await shot('12-instances')
+  await ev(`document.querySelector('.nav[data-page=play]').click()`)
+  await sleep(600)
+  await shot('13-play-ready')
+  await ev(`document.querySelector('#playBtn').click()`)
+  for (let n = 0; n < 6; n++) {
+    await sleep(5000)
+    await shot('14-progress-' + n)
+  }
+}

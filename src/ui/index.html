@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Aluma Launcher</title>
+<link rel="icon" type="image/svg+xml" href="assets/aluma-icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-motion="full">
+<div class="drag"></div>
+<div class="wc" id="wc">
+  <button class="icon-btn" data-w="min" data-i18n-aria="win.min"><svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg></button>
+  <button class="icon-btn" data-w="max" data-i18n-aria="win.max"><svg viewBox="0 0 24 24"><path d="M18 4H6C4.9 4 4 4.9 4 6v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H6V6h12v12z"/></svg></button>
+  <button class="icon-btn close" data-w="close" data-i18n-aria="win.close"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+</div>
+
+<div class="shell" id="shell">
+  <nav class="rail" id="rail">
+    <div class="rail-logo" id="logo" title="Aluma Launcher"></div>
+    <button class="nav" data-page="play"><span class="pill" data-ic="play"></span><span class="lbl" data-i18n="nav.play"></span></button>
+    <button class="nav" data-page="instances"><span class="pill" data-ic="layers"></span><span class="lbl" data-i18n="nav.instances"></span></button>
+    <button class="nav" data-page="browse"><span class="pill" data-ic="cloud"></span><span class="lbl" data-i18n="nav.browse"></span></button>
+    <button class="nav" data-page="accounts"><span class="pill" data-ic="person"></span><span class="lbl" data-i18n="nav.accounts"></span></button>
+    <button class="nav" data-page="console"><span class="pill" data-ic="term"></span><span class="lbl" data-i18n="nav.console"></span></button>
+    <div class="grow"></div>
+    <button class="nav" data-page="settings"><span class="pill" data-ic="settings"></span><span class="lbl" data-i18n="nav.settings"></span></button>
+  </nav>
+
+  <main id="main">
+    <section class="page" id="page-play">
+      <div class="hero" id="hero">
+        <div class="blob b1"></div><div class="blob b2"></div>
+        <div class="hero-av av" id="heroArt"></div>
+        <div class="hero-info">
+          <span class="chip" id="heroChip">—</span>
+          <h1 id="heroName"></h1>
+          <p id="heroMeta" class="body muted"></p>
+          <div class="play-row">
+            <button class="btn fab" id="playBtn"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg><span id="playTxt"></span></button>
+            <select id="heroSelect" data-label-i18n="play.instance" data-cls="hero-sel"></select>
+          </div>
+          <div class="linear" id="prog"><div class="track"><b id="progBar"></b></div><div class="ptxt"><span id="progStage"></span><span id="progPct"></span></div></div>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div id="recentBox"></div>
+    </section>
+
+    <section class="page" id="page-instances">
+      <div class="head">
+        <h2 data-i18n="inst.title"></h2>
+        <div class="tf search"><input id="instSearch" placeholder=" " autocomplete="off"><label data-i18n="common.search"></label></div>
+      </div>
+      <div id="instList"></div>
+      <button class="btn fab fixed" id="newInst"><span data-ic="add"></span><span data-i18n="inst.new"></span></button>
+    </section>
+
+    <section class="page" id="page-instance"></section>
+
+    <section class="page" id="page-browse">
+      <div class="head"><h2 data-i18n="browse.title"></h2></div>
+      <div class="panel flat" id="browseBar">
+        <div class="row wrap">
+          <select id="bInst" data-label-i18n="browse.target" data-cls="grow"></select>
+          <div class="seg" id="bKind"><i class="ind"></i><button data-v="mods" data-i18n="kind.mods"></button><button data-v="resourcepacks" data-i18n="kind.resourcepacks"></button><button data-v="shaderpacks" data-i18n="kind.shaderpacks"></button></div>
+          <div class="seg" id="bSource"><i class="ind"></i><button data-v="modrinth">Modrinth</button><button data-v="curseforge">CurseForge</button></div>
+        </div>
+        <div class="row">
+          <div class="tf grow"><input id="bQuery" placeholder=" " autocomplete="off"><label data-i18n="browse.query"></label></div>
+          <select id="bSort" data-label-i18n="browse.sort" data-cls="w180"></select>
+        </div>
+      </div>
+      <div id="bResults" class="results"></div>
+    </section>
+
+    <section class="page" id="page-accounts">
+      <div class="head"><h2 data-i18n="acc.title"></h2></div>
+      <div class="list" id="accList"></div>
+      <div class="panel">
+        <h3 data-i18n="acc.add"></h3>
+        <div class="row">
+          <div class="tf grow"><input id="offName" placeholder=" " maxlength="16" autocomplete="off"><label data-i18n="acc.offline"></label></div>
+          <button class="btn filled" id="addOff" data-i18n="common.add"></button>
+        </div>
+        <div class="row"><button class="btn tonal" id="addMs"><span data-ic="windows"></span><span data-i18n="acc.ms"></span></button></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-console">
+      <div class="head"><h2 data-i18n="con.title"></h2><div class="row"><button class="btn text" id="copyLog" data-i18n="common.copy"></button><button class="btn text" id="clearLog" data-i18n="con.clear"></button></div></div>
+      <pre class="log" id="log"></pre>
+    </section>
+
+    <section class="page" id="page-settings"></section>
+  </main>
+</div>
+
+<div id="layer"></div>
+<div class="snacks" id="snacks"></div>
+<script src="i18n.js"></script>
+<script src="lib.js"></script>
+<script src="app.js"></script>
+<script src="instance.js"></script>
+<script src="browse.js"></script>
+<script src="settings.js"></script>
+<script src="setup.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>

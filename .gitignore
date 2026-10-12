@@ -1,0 +1,17 @@
+node_modules/
+data/
+FreesmLauncher/
+test/shots/
+dist/
+build/
+out/
+coverage/
+tmp/
+.DS_Store
+*.log
+.env
+.env.*
+*.local.js
+.aws/
+.codex/
+.agents/
