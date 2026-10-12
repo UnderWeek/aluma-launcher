@@ -121,44 +121,9 @@ async function remember(i, kind, file, meta) {
   await writeTrack(i, t)
 }
 
-async function installModrinth(i, kind, projectId, onProgress, signal, depth) {
-  const k = kindOf(kind)
-  const q = new URLSearchParams()
-  q.set('game_versions', JSON.stringify([i.mc]))
-  if (k.loader && i.loader !== 'vanilla') q.set('loaders', JSON.stringify([i.loader]))
-  const [list, proj] = await Promise.all([mr(`/project/${projectId}/version?${q}`), mr(`/project/${projectId}`)])
-  if (!list.length) throw new LErr('mods.noFile', { mc: i.mc, loader: i.loader })
-  const v = list.find((x) => x.version_type === 'release') || list[0]
-  const f = v.files.find((x) => x.primary) || v.files[0]
-  const file = safeFile(f.filename)
-  const dir = targetDir(i, kind)
-  onProgress({ stage: 'mods.downloading', arg: proj.title, pct: 0 })
-  let done = 0
-  await U.download(f.url, path.join(dir, file), {
-    sha1: f.hashes && f.hashes.sha1,
-    size: f.size,
-    signal,
-    onBytes: (n) => {
-      done += n
-      onProgress({ stage: 'mods.downloading', arg: proj.title, pct: f.size ? Math.min(1, done / f.size) : 0 })
-    }
-  })
-  await dropOld(i, kind, 'mr:' + projectId, file)
-  await remember(i, kind, file, { source: 'modrinth', projectId: 'mr:' + projectId, versionId: v.id, title: proj.title, version: v.version_number })
-  const installed = [{ title: proj.title, file }]
-  if (depth < 2 && k.loader) {
-    const t = await readTrack(i)
-    const have = new Set(Object.values(t[kind] || {}).map((m) => m.projectId))
-    for (const d of v.dependencies || []) {
-      if (d.dependency_type !== 'required' || !d.project_id || have.has('mr:' + d.project_id)) continue
-      try {
-        installed.push(...(await installModrinth(i, kind, d.project_id, onProgress, signal, depth + 1)))
-      } catch (e) {
-        if (e.name === 'AbortError') throw e
-      }
-    }
-  }
-  return installed
+async function installModrinth(i, kind, projectId, onProgress, signal) {
+  const result = await require('./modrinth-install').installMany(i, kind, [projectId], onProgress, signal)
+  return result.files
 }
 
 async function installCurseforge(i, kind, modId, title, onProgress, signal) {
@@ -187,10 +152,11 @@ async function installCurseforge(i, kind, modId, title, onProgress, signal) {
   return [{ title, file }]
 }
 
-async function install({ instId, kind, source, id, title }, onProgress = () => {}, signal) {
+async function installOne({ instId, kind, source, id, title }, onProgress = () => {}, signal) {
   const i = inst(instId)
+  if (kind === 'mods' && i.loader === 'vanilla') throw new LErr('mods.noLoader')
   await fs.promises.mkdir(targetDir(i, kind), { recursive: true })
-  if (source !== 'curseforge') return { source, files: await installModrinth(i, kind, id, onProgress, signal, 0) }
+  if (source !== 'curseforge') return { source, files: await installModrinth(i, kind, id, onProgress, signal) }
   try {
     return { source, files: await installCurseforge(i, kind, id, title, onProgress, signal) }
   } catch (e) {
@@ -200,8 +166,38 @@ async function install({ instId, kind, source, id, title }, onProgress = () => {
     const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '')
     const hit = r.hits.find((h) => norm(h.title) === norm(title))
     if (!hit) throw e
-    return { source: 'modrinth', fallback: true, files: await installModrinth(i, kind, hit.id, onProgress, signal, 0) }
+    return { source: 'modrinth', fallback: true, files: await installModrinth(i, kind, hit.id, onProgress, signal) }
   }
+}
+
+const installQueues = new Map()
+function enqueue(instId, work, signal) {
+  const previous = installQueues.get(instId) || Promise.resolve()
+  const pending = previous.catch(() => {}).then(() => {
+    if (signal && signal.aborted) throw U.abortErr()
+    return work()
+  })
+  installQueues.set(instId, pending)
+  return pending.finally(() => {
+    if (installQueues.get(instId) === pending) installQueues.delete(instId)
+  })
+}
+
+function install(req, onProgress = () => {}, signal) {
+  return enqueue(req.instId, () => installOne(req, onProgress, signal), signal)
+}
+
+function installMany({ instId, kind, source, items }, onProgress = () => {}, signal) {
+  if (!Array.isArray(items) || !items.length || items.length > 100 || items.some(item => !item || typeof item.id !== 'string')) throw new LErr('mods.selection')
+  return enqueue(instId, async () => {
+    if (source === 'modrinth') return require('./modrinth-install').installMany(inst(instId), kind, [...new Set(items.map(item => item.id))], onProgress, signal)
+    const files = []
+    for (let index = 0; index < items.length; index++) {
+      const result = await installOne({ ...items[index], instId, kind, source }, p => onProgress({ ...p, pct: (index + p.pct) / items.length }), signal)
+      files.push(...result.files)
+    }
+    return { source, files }
+  }, signal)
 }
 
 function meta(zipPath) {
@@ -247,7 +243,9 @@ async function list(instId, kind) {
       title: tr.title || m.name || real.replace(/\.(jar|zip)$/i, ''),
       version: tr.version || m.version || '',
       description: m.description || '',
-      source: tr.source || ''
+      source: tr.source || '',
+      projectId: tr.projectId || '',
+      versionId: tr.versionId || ''
     })
   }
   return out.sort((a, b) => a.title.localeCompare(b.title))
@@ -281,4 +279,4 @@ async function openDir(instId, kind) {
   return d
 }
 
-module.exports = { search, install, list, toggle, remove, openDir, testCurseforge }
+module.exports = { search, install, list, toggle, remove, openDir, testCurseforge, installMany }

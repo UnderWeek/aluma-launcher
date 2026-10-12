@@ -222,7 +222,18 @@ handle('mods:fetchKey', () => {
   }
   return fetchingCfKey
 })
+handle('mods:installMany', async (req) => {
+  if (running.has(req.instId)) throw new LErr('mods.running')
+  const ctrl = new AbortController()
+  installs.set(req.key, ctrl)
+  try {
+    return await M.installMany(req, p => send('mods:progress', { key: req.key, ...p }), ctrl.signal)
+  } finally {
+    installs.delete(req.key)
+  }
+})
 handle('mods:install', async (req) => {
+  if (running.has(req.instId)) throw new LErr('mods.running')
   const key = req.key
   const ctrl = new AbortController()
   installs.set(key, ctrl)

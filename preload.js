@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('launcher', {
   modsTestKey: call('mods:testKey'),
   modsFetchKey: call('mods:fetchKey'),
   modsInstall: call('mods:install'),
+  modsInstallMany: call('mods:installMany'),
   modsCancel: call('mods:cancel'),
   sysInfo: call('sys:info'),
   netTest: call('net:test'),

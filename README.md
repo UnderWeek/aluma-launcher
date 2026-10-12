@@ -30,6 +30,24 @@ Existing repository-local `data/` is copied to `.aluma` on the first migration
 when the destination does not exist; the old folder remains as a backup.
 Users can select a custom instances directory in Settings.
 
+## Installing mods
+
+In Browse, choose a Fabric instance, enable the switches for the mods you want,
+then click **Download selected**. The selection survives searches and pagination.
+
+For Modrinth, the launcher resolves required dependencies, including exact
+version IDs and nested dependency chains. It checks Minecraft/loader metadata,
+declared incompatible projects, and Fabric JAR manifests (including nested
+libraries, required mod versions, and loader requirements). Files are downloaded
+to a staging directory; errors and cancellation leave the original files intact,
+and failures while applying changes trigger rollback.
+
+These checks do not guarantee that arbitrary mods will run together. Unknown
+runtime conflicts and custom Java requirements cannot all be determined during
+installation. Conflicting selected versions are reported rather than silently
+downgraded. CurseForge supports batch selection but does not yet resolve its
+dependencies automatically.
+
 ## Authentication and API configuration
 
 Aluma's public Microsoft application ID is in `src/core/auth-config.js`.
@@ -43,13 +61,15 @@ ignored by Git. Never publish keys, account tokens, or user data.
 ## Checks
 
 ```sh
+node test/fabric-check.js
+node test/modrinth-install.js
 node test/auth.js
 node test/data-dir.js
 node test/curseforge-key.js
 node test/keys.js
 ```
 
-The first three scripts use isolated fixtures. The translation checker reports
+The first five scripts use isolated fixtures. The translation checker reports
 missing keys and malformed rows; dynamic key prefixes may appear in its output.
 
 ## Website

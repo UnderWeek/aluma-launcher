@@ -71,7 +71,13 @@
           <select id="bSort" data-label-i18n="browse.sort" data-cls="w180"></select>
         </div>
       </div>
-      <div id="bResults" class="results"></div>
+      <div id="bResults" class="results" role="list"></div>
+      <div class="batch-bar" id="bBatchBar">
+        <div class="batch-meta"><span id="bSelected" aria-live="polite"></span><span class="muted label hidden" id="bBatchStatus"></span><div class="batch-progress hidden"><div id="bBatchProgress"></div></div></div>
+        <button class="btn text" id="bClear" data-i18n="browse.clearSelection"></button>
+        <button class="btn tonal hidden" id="bCancel" data-i18n="play.cancel"></button>
+        <button class="btn filled" id="bDownload" disabled></button>
+      </div>
     </section>
 
     <section class="page" id="page-accounts">

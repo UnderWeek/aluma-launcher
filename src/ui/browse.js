@@ -1,5 +1,7 @@
 const browseState = { kind: 'mods', source: 'modrinth', sort: 'relevance', offset: 0, total: 0, hits: [], seq: 0, loading: false }
-const installing = new Map()
+const selectedMods = new Map()
+const installedMods = new Set()
+const batchInstall = { busy: false, key: null, pct: 0, stage: '' }
 let bTimer = null
 
 function sortOptions() {
@@ -13,21 +15,48 @@ function browseSync() {
 }
 
 function skeletons(n = 6) {
-  return Array.from({ length: n }, () => `<div class="item rcard skel"><div class="ic sq"></div><div class="meta"><div class="sk l1"></div><div class="sk l2"></div><div class="sk l3"></div></div></div>`).join('')
+  return Array.from({ length: n }, () => `<div class="item mod-row skel"><div class="ic sq"></div><div class="meta"><div class="sk l1"></div><div class="sk l2"></div><div class="sk l3"></div></div></div>`).join('')
+}
+
+const modKey = (h) => `${h.source}:${h.id}`
+const canInstallMods = () => {
+  const target = instById($('#bInst').value)
+  return target && !(browseState.kind === 'mods' && target.loader === 'vanilla')
 }
 
 function resultCard(h, idx) {
-  const key = `${h.source}:${h.id}`
-  const st = installing.get(key)
-  return `<div class="item rcard" data-k="${esc(key)}" data-idx="${idx}">
+  const key = modKey(h)
+  const installed = installedMods.has(key)
+  const checked = selectedMods.has(key)
+  return `<div class="item mod-row ${checked ? 'selected' : ''}" data-k="${esc(key)}" data-idx="${idx}" role="listitem">
     ${h.icon ? `<img class="ic sq" src="${esc(h.icon)}" loading="lazy" alt="">` : `<div class="ic sq">${ic('puzzle')}</div>`}
     <div class="meta"><div class="nm">${esc(h.title)}</div><div class="muted label">${esc(h.author)} · ${ic('download')}${fmtNum(h.downloads)}</div><div class="desc">${esc(h.description)}</div></div>
-    <div class="ract">${installBtn(st)}</div></div>`
+    <div class="mod-choice">${installed ? `<span class="mod-installed">${ic('check')}${esc(t('browse.installed'))}</span>` : ''}
+      <label class="switch-row mod-switch"><input type="checkbox" role="switch" data-a="select" aria-label="${esc(t('browse.selectMod', { name: h.title }))}" ${checked ? 'checked' : ''} ${batchInstall.busy || installed || !canInstallMods() ? 'disabled' : ''}><span class="sw" aria-hidden="true"></span></label>
+    </div></div>`
 }
-function installBtn(st) {
-  if (!st) return `<button class="btn filled sm" data-a="inst">${ic('download')}${esc(t('browse.install'))}</button>`
-  if (st.state === 'busy') return `<button class="btn tonal sm busy" data-a="cancel" style="--p:${Math.round((st.pct || 0) * 100)}%">${esc(Math.round((st.pct || 0) * 100) + '%')} · ${esc(t('play.cancel'))}</button>`
-  return `<button class="btn tonal sm done" data-a="inst">${ic('check')}${esc(t('browse.installed'))}</button>`
+
+function updateBatchBar() {
+  const button = $('#bDownload')
+  const blocked = !canInstallMods()
+  $('#bSelected').textContent = batchInstall.busy ? t('browse.batchProgress', { pct: Math.round(batchInstall.pct * 100) }) : blocked && instById($('#bInst').value) ? t('err.mods.noLoader') : t('browse.selectedCount', { n: selectedMods.size })
+  button.disabled = batchInstall.busy || !selectedMods.size || blocked
+  button.innerHTML = ic('download') + esc(t('browse.downloadSelected'))
+  $('#bCancel').classList.toggle('hidden', !batchInstall.busy)
+  $('#bClear').disabled = batchInstall.busy || !selectedMods.size
+  $('#bBatchProgress').style.width = Math.round(batchInstall.pct * 100) + '%'
+  $('#bBatchProgress').parentElement.classList.toggle('hidden', !batchInstall.busy)
+  $('#bBatchStatus').textContent = batchInstall.busy ? stageText({ stage: batchInstall.stage, arg: batchInstall.arg }) : ''
+  $('#bBatchStatus').classList.toggle('hidden', !batchInstall.busy)
+  $('#browseBar').inert = batchInstall.busy
+  $$('#browseBar select, #bKind button, #bSource button').forEach(el => { el.disabled = batchInstall.busy })
+  $$('.mod-row input').forEach(el => { el.disabled = batchInstall.busy || installedMods.has(el.closest('.mod-row').dataset.k) || blocked })
+}
+
+function clearSelection() {
+  selectedMods.clear()
+  installedMods.clear()
+  updateBatchBar()
 }
 
 async function browseSearch(reset) {
@@ -37,6 +66,7 @@ async function browseSearch(reset) {
     browseState.offset = 0
     browseState.hits = []
     box.innerHTML = skeletons()
+    updateBatchBar()
   }
   if (!target) {
     box.innerHTML = `<div class="empty-big small"><div class="eb-ic">${ic('layers')}</div><h3>${esc(t('browse.noInst'))}</h3></div>`
@@ -56,6 +86,7 @@ async function browseSearch(reset) {
   if (seq !== browseState.seq) return
   browseState.loading = false
   if (!r.ok && browseState.source === 'curseforge' && (r.code === 'cf.noKey' || r.code === 'cf.badKey') && !S.settings.curseforgeKey) {
+    clearSelection()
     browseState.source = 'modrinth'
     segSet($('#bSource'), 'modrinth')
     toast(t('browse.cfFallback'))
@@ -72,6 +103,16 @@ async function browseSearch(reset) {
     if (rt) rt.onclick = () => browseSearch(true)
     return
   }
+  const listed = await api.modsList({ instId: target.id, kind: browseState.kind })
+  if (seq !== browseState.seq) return
+  if (listed.ok) {
+    installedMods.clear()
+    for (const mod of listed.data) {
+      if (!mod.enabled || !mod.projectId) continue
+      installedMods.add(mod.projectId.replace(/^mr:/, 'modrinth:').replace(/^cf:/, 'curseforge:'))
+    }
+  }
+  updateBatchBar()
   const start = browseState.hits.length
   browseState.hits.push(...r.data.hits)
   browseState.total = r.data.total
@@ -94,55 +135,51 @@ async function browseSearch(reset) {
   if (rest) box.insertAdjacentHTML('beforeend', `<button class="btn tonal" id="more">${esc(t('browse.more'))}</button>`)
 }
 
-function setProgressUi(key) {
-  const card = $(`.rcard[data-k="${CSS.escape(key)}"]`)
-  if (!card) return
-  $('.ract', card).innerHTML = installBtn(installing.get(key))
+$('#bResults').onchange = event => {
+  const input = event.target.closest('input[data-a="select"]')
+  if (!input || batchInstall.busy) return
+  const row = input.closest('.mod-row')
+  const hit = browseState.hits[+row.dataset.idx]
+  if (input.checked) selectedMods.set(modKey(hit), hit)
+  else selectedMods.delete(modKey(hit))
+  row.classList.toggle('selected', input.checked)
+  updateBatchBar()
 }
-
-async function startInstall(h) {
+$('#bResults').onclick = event => {
+  if (event.target.closest('#more')) return browseSearch(false)
+}
+$('#bClear').onclick = () => {
+  selectedMods.clear()
+  $$('.mod-row').forEach(row => { row.classList.remove('selected'); $('input', row).checked = false })
+  updateBatchBar()
+}
+$('#bCancel').onclick = () => batchInstall.key && api.modsCancel(batchInstall.key)
+$('#bDownload').onclick = async () => {
+  if (batchInstall.busy || !selectedMods.size || !canInstallMods()) return
   const target = instById($('#bInst').value)
-  if (!target) return
-  const key = `${h.source}:${h.id}:${target.id}:${browseState.kind}`
-  const uiKey = `${h.source}:${h.id}`
-  installing.set(uiKey, { state: 'busy', pct: 0, key })
-  setProgressUi(uiKey)
-  const r = await api.modsInstall({ key, instId: target.id, kind: browseState.kind, source: h.source, id: h.id, title: h.title })
-  if (!r.ok) {
-    installing.delete(uiKey)
-    setProgressUi(uiKey)
-    if (!/Cancelled|AbortError/.test(r.error || '')) toast(errFrom(r.code, r.params, r.error), true)
-    return
-  }
-  installing.set(uiKey, { state: 'done' })
-  setProgressUi(uiKey)
-  const n = r.data.files.length
-  toast(r.data.fallback ? t('browse.viaModrinth', { name: h.title }) : n > 1 ? t('browse.installedDeps', { name: h.title, n: n - 1 }) : t('browse.installedOk', { name: h.title }))
-  if (page === 'instance') loadContent()
-}
-
-api.onModsProgress((p) => {
-  for (const [k, v] of installing) {
-    if (v.key === p.key) {
-      v.pct = p.pct
-      const card = $(`.rcard[data-k="${CSS.escape(k)}"] .busy`)
-      if (card) {
-        card.style.setProperty('--p', Math.round(p.pct * 100) + '%')
-        card.firstChild.textContent = Math.round(p.pct * 100) + '% · '
-      }
+  const selected = [...selectedMods.values()]
+  const key = 'batch:' + target.id + ':' + Date.now()
+  Object.assign(batchInstall, { busy: true, key, pct: 0, stage: 'mods.resolving', arg: '' })
+  updateBatchBar()
+  try {
+    const response = await api.modsInstallMany({ key, instId: target.id, kind: browseState.kind, source: browseState.source, items: selected.map(h => ({ id: h.id, title: h.title })) })
+    if (!response.ok) {
+      if (!/Cancelled|AbortError/.test(response.error || '')) await dialog({ title: t('browse.installFailed'), html: `<p class="body">${esc(errFrom(response.code, response.params, response.error))}</p>`, actions: [{ label: t('common.ok'), value: true, kind: 'filled' }] })
+      return
     }
+    selectedMods.clear()
+    toast(t('browse.batchDone', { n: response.data.files.length }))
+  } finally {
+    Object.assign(batchInstall, { busy: false, key: null, pct: 0, stage: '', arg: '' })
+    updateBatchBar()
+    await browseSearch(true)
   }
-})
-
-$('#bResults').onclick = (e) => {
-  if (e.target.closest('#more')) return browseSearch(false)
-  const b = e.target.closest('[data-a]')
-  const card = e.target.closest('.rcard')
-  if (!b || !card) return
-  const h = browseState.hits[+card.dataset.idx]
-  if (b.dataset.a === 'inst') startInstall(h)
-  if (b.dataset.a === 'cancel') api.modsCancel(installing.get(card.dataset.k).key)
 }
+api.onModsProgress(progress => {
+  if (progress.key !== batchInstall.key) return
+  Object.assign(batchInstall, { pct: progress.pct || 0, stage: progress.stage, arg: progress.arg })
+  updateBatchBar()
+})
 
 const debounced = () => {
   clearTimeout(bTimer)
@@ -160,7 +197,7 @@ $('#bSort').onchange = (e) => {
   browseSearch(true)
 }
 $('#bInst').onchange = () => {
-  installing.clear()
+  clearSelection()
   browseSearch(true)
 }
 $('#bKind').onclick = (e) => {
@@ -168,12 +205,13 @@ $('#bKind').onclick = (e) => {
   if (!b) return
   browseState.kind = b.dataset.v
   segSet($('#bKind'), browseState.kind)
-  installing.clear()
+  clearSelection()
   browseSearch(true)
 }
 $('#bSource').onclick = (e) => {
   const b = e.target.closest('button')
   if (!b) return
+  clearSelection()
   browseState.source = b.dataset.v
   segSet($('#bSource'), browseState.source)
   browseSearch(true)
@@ -181,8 +219,11 @@ $('#bSource').onclick = (e) => {
 
 let browseFirst = true
 onEnter.browse = () => {
+  const previous = $('#bInst').value
   fillInstanceSelects()
+  if (previous !== $('#bInst').value && !batchInstall.busy) clearSelection()
   requestAnimationFrame(browseSync)
+  updateBatchBar()
   if (browseFirst || !browseState.hits.length) {
     browseFirst = false
     browseSearch(true)
