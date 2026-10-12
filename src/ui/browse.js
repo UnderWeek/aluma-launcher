@@ -1,7 +1,7 @@
 const browseState = { kind: 'mods', source: 'modrinth', sort: 'relevance', offset: 0, total: 0, hits: [], seq: 0, loading: false }
 const selectedMods = new Map()
 const installedMods = new Set()
-const selectionCheck = { busy: false, failed: false, message: '', seq: 0 }
+const selectionCheck = { busy: false, failed: false, message: '', seq: 0, timer: null, pending: Promise.resolve() }
 const batchInstall = { busy: false, key: null, pct: 0, stage: '' }
 let bTimer = null
 
@@ -59,6 +59,7 @@ function updateBatchBar() {
 function clearSelection() {
   closeModDetails()
   selectionCheck.seq++
+  clearTimeout(selectionCheck.timer)
   Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
   selectedMods.clear()
   installedMods.clear()
@@ -166,6 +167,7 @@ $('#bResults').onkeydown = event => {
 }
 $('#bClear').onclick = () => {
   selectionCheck.seq++
+  clearTimeout(selectionCheck.timer)
   Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
   selectedMods.clear()
   $$('.mod-row').forEach(row => { row.classList.remove('selected'); $('input', row).checked = false })
@@ -309,12 +311,20 @@ async function openModDetails(hit) {
 addEventListener('keydown', event => { if (event.key === 'Escape' && !$('#bDetail').hidden) closeModDetails() })
 
 
-async function checkSelectedMods() {
+function checkSelectedMods() {
+  clearTimeout(selectionCheck.timer)
   const seq = ++selectionCheck.seq
   Object.assign(selectionCheck, { busy: false, failed: false, message: '' })
   if (!selectedMods.size || browseState.source !== 'modrinth') return updateBatchBar()
   selectionCheck.busy = true
   updateBatchBar()
+  selectionCheck.timer = setTimeout(() => {
+    selectionCheck.pending = selectionCheck.pending.catch(() => {}).then(() => runSelectionCheck(seq))
+  }, 500)
+}
+
+async function runSelectionCheck(seq) {
+  if (seq !== selectionCheck.seq) return
   try {
     const response = await api.modsCheckSelection({ instId: $('#bInst').value, kind: browseState.kind, source: browseState.source, items: [...selectedMods.values()].map(hit => ({ id: hit.id })) })
     if (seq !== selectionCheck.seq) return

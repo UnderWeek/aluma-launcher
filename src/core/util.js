@@ -11,7 +11,10 @@ const UA = 'AlumaLauncher/1.0'
 const OS = { darwin: 'osx', win32: 'windows', linux: 'linux' }[process.platform]
 const ARCH = process.arch === 'arm64' ? 'arm64' : process.arch === 'ia32' ? 'x86' : 'x64'
 
-const fetchJson = (url, opts = {}) => H.json(url, { ...opts, headers: { 'User-Agent': UA, ...(opts.headers || {}) } })
+const fetchJson = (url, opts = {}) => {
+  const options = { ...opts, headers: { 'User-Agent': UA, ...(opts.headers || {}) } }
+  return String(url).startsWith('https://api.modrinth.com/') ? require('./modrinth-client').request(url, options) : H.json(url, options)
+}
 
 const readJson = async (p) => JSON.parse(await fs.promises.readFile(p, 'utf8'))
 const writeJson = async (p, data) => {
