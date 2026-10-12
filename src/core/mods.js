@@ -78,31 +78,16 @@ async function search({ source, kind, query, mc, loader, sort, offset = 0, limit
   const facets = [[`project_type:${k.mr}`]]
   if (mc) facets.push([`versions:${mc}`])
   if (k.loader && loader && loader !== 'vanilla') facets.push([`categories:${loader}`])
-  let r, hits, nextOffset = offset
-  const cache = new Map()
-  // Resolve required dependencies with the same planner used for installation.
-  for (let page = 0; page < 5; page++) {
-    const q = new URLSearchParams({ query: query || '', limit, offset: nextOffset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
-    r = await mr('/search?' + q)
-    const available = new Map()
-    await U.pool(r.hits, 6, async h => {
-      try {
-        await require('./modrinth-install').checkMany({ mc, loader, id: 'catalog' }, kind, [h.project_id], { catalog: true, cache })
-        available.set(h.project_id, true)
-      } catch (error) {
-        if (!['mods.noProjectFile', 'mods.noLoader', 'mods.dependency', 'mods.conflict'].includes(error.code)) throw error
-        available.set(h.project_id, false)
-      }
-    })
-    nextOffset += r.hits.length
-    hits = r.hits.filter(h => available.get(h.project_id))
-    if (hits.length || !r.hits.length || nextOffset >= r.total_hits) break
-  }
+  if (k.loader) facets.push(['client_side:required', 'client_side:optional'])
+  // Catalogue searches stay lightweight; resolve only the user's selection.
+  const q = new URLSearchParams({ query: query || '', limit, offset, index: MR_SORT[sort] || 'relevance', facets: JSON.stringify(facets) })
+  const r = await mr('/search?' + q)
+  const nextOffset = offset + r.hits.length
   return {
     total: r.total_hits,
     nextOffset,
     hasMore: nextOffset < r.total_hits,
-    hits: hits.map((h) => ({
+    hits: r.hits.map((h) => ({
       id: h.project_id,
       source: 'modrinth',
       title: h.title,
