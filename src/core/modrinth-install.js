@@ -144,11 +144,16 @@ async function installMany(instance, kind, ids, progress = () => {}, signal) {
     for (let index = 0; index < plan.length; index++) {
       const item = plan[index]
       let bytes = 0
+      let label = item.title
       await U.download(item.file.url, path.join(staging, 'files', item.name), {
         sha1: item.file.hashes?.sha1, size: item.file.size, signal,
+        onRetry: ({ attempt, attempts }) => {
+          label = `${item.title} (${attempt}/${attempts})`
+          progress({ stage: 'mods.retrying', arg: label, pct: index / plan.length })
+        },
         onBytes: amount => {
           bytes += amount
-          progress({ stage: 'mods.downloading', arg: item.title, done: index, total: plan.length, pct: (index + Math.min(1, Math.max(0, bytes / (item.file.size || 1)))) / plan.length })
+          progress({ stage: 'mods.downloading', arg: label, done: index, total: plan.length, pct: (index + Math.min(1, Math.max(0, bytes / (item.file.size || 1)))) / plan.length })
         }
       })
       if (item.file.size && (await fs.stat(path.join(staging, 'files', item.name))).size !== item.file.size) throw new LErr('checksum', { url: item.file.url })

@@ -45,7 +45,7 @@ function abortErr() {
 }
 
 async function download(url, dest, o = {}) {
-  const { sha1, size, quick, onBytes = () => {}, onHead, signal } = o
+  const { sha1, size, quick, onBytes = () => {}, onHead, onRetry, signal } = o
   if (signal && signal.aborted) throw abortErr()
   if (await valid(dest, sha1, size, quick)) {
     onBytes(size || 0)
@@ -58,7 +58,8 @@ async function download(url, dest, o = {}) {
     let written = 0
     const tmp = dest + '.part'
     try {
-      const r = await H.fetch(url, { headers: { 'User-Agent': UA, ...(o.headers || {}) }, signal })
+      if (i && onRetry) onRetry({ attempt: i + 1, attempts: tries })
+      const r = await H.fetch(url, { headers: { 'User-Agent': UA, ...(i ? { 'Cache-Control': 'no-cache' } : {}), ...(o.headers || {}) }, signal })
       if (!r.ok) throw new LErr('http', { status: r.status, url }, `HTTP ${r.status} ${url}`)
       if (onHead) onHead(Number(r.headers.get('content-length')) || 0)
       const src = Readable.fromWeb(r.body)
@@ -67,12 +68,20 @@ async function download(url, dest, o = {}) {
         onBytes(c.length)
       })
       await pipeline(src, fs.createWriteStream(tmp), { signal })
-      if (sha1 && !quick && (await sha1File(tmp)) !== sha1) throw new LErr('checksum', { url }, 'Checksum mismatch: ' + url)
+      const actualSize = (await fs.promises.stat(tmp)).size
+      const actualHash = sha1 && !quick ? await sha1File(tmp) : undefined
+      if ((size && actualSize !== size) || (actualHash && actualHash !== sha1)) {
+        throw new LErr('download.integrity', {
+          name: path.basename(dest), url, attempts: i + 1,
+          expectedSize: size, actualSize, expectedHash: sha1, actualHash
+        }, 'File verification failed: ' + path.basename(dest))
+      }
       await fs.promises.rename(tmp, dest)
       return
     } catch (e) {
       onBytes(-written)
-      fs.promises.rm(tmp, { force: true }).catch(() => {})
+      // Finish cleanup before opening the same temporary path on the next attempt.
+      await fs.promises.rm(tmp, { force: true })
       if (signal && signal.aborted) throw abortErr()
       err = e
       if (e.code === 'http' && e.params.status === 404) break
