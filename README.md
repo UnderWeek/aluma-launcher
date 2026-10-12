@@ -1,5 +1,7 @@
 # Aluma Launcher
 
+English · [Русский](README_ru.md)
+
 An independent Minecraft: Java Edition launcher built with Electron and plain
 JavaScript. Aluma organizes separate game instances and supports Vanilla,
 Fabric, mod browsing, and Microsoft account sign-in.
@@ -53,7 +55,9 @@ missing keys and malformed rows; dynamic key prefixes may appear in its output.
 ## Website
 
 GitHub Pages serves `docs/`. The custom domain is `aluma.lostcat.online`.
-See `docs/DEPLOYMENT.md` for DNS setup.
+The site selects Russian or English from browser preferences and offers a
+language switcher that remembers the visitor’s choice. Other languages fall
+back to English. See `docs/DEPLOYMENT.md` for DNS setup.
 
 ## Contributing
 
